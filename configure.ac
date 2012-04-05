@@ -13,12 +13,15 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 
 # Checks for libraries.
+AC_CHECK_LIB(pthread, pthread_create)
 
 # Checks for header files.
+AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 
 # Checks for library functions.
+AC_CHECK_FUNCS([inet_ntoa socket])
 
 AC_CONFIG_FILES([Makefile
 				 src/Makefile])
