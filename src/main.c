@@ -9,6 +9,9 @@
 #include <sys/epoll.h>
 #include <errno.h>
 
+#include "crb_client.h"
+#include "crb_reader.h"
+
 #define SERVER_PORT 8080
 #define MAX_QUERIES 200
 #define BUFF_SIZE 20
@@ -25,43 +28,21 @@ check( int value )
  	}
 }
 
-
-void* 
-process_query( void* sock_desc )
-{
-	char query[BUFF_SIZE];
-	int client = (int) sock_desc;
-
-	printf( "Starting handler for client:%d\n", client );
-	
-	do
-	{
-		// Read
-		read( client, &query, BUFF_SIZE );
-
-		// Write the same
-		write( client, &query, strlen(query) );
-	} while ( strcmp(query, "exit") != 0 );
-	
-	printf( "Done.. \n" );
-	
-	printf( "Terminating handler for client:%d\n", client );
-	close(client);
-	pthread_exit( NULL );
-
-	return 0;
-}
-
-
 int 
 main()
 {
+	crb_reader_t* reader = crb_reader_init();
+	crb_client_t *client;
+	/* old code */
+	
 	int sock_desc, r_bind, r_listen, new_desc;
 	int efd;
 	struct epoll_event event;
 	struct epoll_event *events;
 	struct sockaddr_in address;
 	pthread_t handler;
+	
+	crb_reader_run(reader);
 	
 	//init server structure
 	address.sin_family = AF_INET;
@@ -148,7 +129,6 @@ main()
 					struct sockaddr_in client_adress;
 					int cleint_addr_len = sizeof(client_adress);
 		
-					printf("Waiting connection ...\n");
 					new_desc = accept( sock_desc, (struct sockaddr*)&client_adress, &cleint_addr_len);
 				
 				
@@ -181,15 +161,17 @@ main()
 						}
 					}
 		
-					printf( "A new query has arrived from: %s\n", inet_ntoa(client_adress.sin_addr));
-		
-					// Create individual thread for the client
-					pthread_create( &handler, NULL, process_query, (void*) new_desc );
+					printf( "\n** A new query has arrived from: %s **\n\n", inet_ntoa(client_adress.sin_addr));
+					client = crb_client_init();
+					client->sock_fd = new_desc;
+					crb_reader_add_client(reader, client);
 				}
 			}
 		}
 		
  	}
+ 	
+ 	close(sock_desc);
 
 	return 0;
 }

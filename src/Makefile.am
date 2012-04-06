@@ -1,7 +1,17 @@
 bin_PROGRAMS = caribou
 
 caribou_SOURCES =      \
-    main.c              
+    main.c             \
+    crb_buffer.c       \
+    crb_buffer.h       \
+    crb_task.c         \
+    crb_task.h         \
+    crb_client.c       \
+    crb_client.h       \
+    crb_reader.c       \
+    crb_reader.h       \
+    crb_worker.c       \
+    crb_worker.h        
 
 caribou_CFLAGS =       \
     -DPACKAGE_DATA_DIR=\""$(datadir)"\" \
