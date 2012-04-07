@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "crb_reader.h"
+#include "crb_buffer.h"
 
 
 crb_reader_t *
@@ -56,11 +57,12 @@ crb_reader_loop(void *data)
 				client = (crb_client_t *) events[i].data.ptr;
 				
 				chars_read = read(client->sock_fd, buf, 5);
-				
-				if ( chars_read >= 0 ) {
-					write(STDIN_FILENO, buf, chars_read);
-					write(client->sock_fd, buf, chars_read);	
+				while ( chars_read >= 0 ) {
+					crb_buffer_append_string(client->buffer_in, buf, chars_read);
+					chars_read = read(client->sock_fd, buf, 5);
 				}
+				
+				write(STDIN_FILENO, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
 			}
 		}
 	}
@@ -100,4 +102,5 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	struct epoll_event event;
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
+	close(client->sock_fd);
 }

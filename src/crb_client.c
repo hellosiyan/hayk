@@ -3,6 +3,8 @@
 
 #include "crb_client.h"
 
+#define CRB_READER_BUFFER_SIZE 4*1024
+
 crb_client_t *
 crb_client_init()
 {
@@ -12,6 +14,14 @@ crb_client_init()
     if (client == NULL) {
         return NULL;
     }
+    
+    client->state = CRB_STATE_CONNECTING;
+    client->buffer_in = crb_buffer_init(CRB_READER_BUFFER_SIZE);
+    if ( client->buffer_in == NULL ) {
+    	free(client);
+    	return NULL;
+    }
 
     return client;
 }
+
