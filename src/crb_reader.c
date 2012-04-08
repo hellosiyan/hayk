@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <string.h>
+#include <errno.h>
 
 #include "crb_reader.h"
 #include "crb_buffer.h"
@@ -34,7 +35,7 @@ crb_reader_init()
 static void* 
 crb_reader_loop(void *data)
 {
-	int n,i, chars_read;
+	int n,i,ci, chars_read;
 	struct epoll_event *events;
 	crb_reader_t *reader;
 	crb_client_t *client;
@@ -48,7 +49,7 @@ crb_reader_loop(void *data)
 	while(1) {
 		n = epoll_wait (reader->epoll_fd, events, 10, -1);
 		for (i = 0; i < n; i += 1) {
-			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) {
+			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
 				client = (crb_client_t *) events[i].data.ptr;
 				crb_reader_drop_client(reader, client);
@@ -57,12 +58,25 @@ crb_reader_loop(void *data)
 				client = (crb_client_t *) events[i].data.ptr;
 				
 				chars_read = read(client->sock_fd, buf, 5);
+				if ( chars_read == 0 ) {
+					continue;
+				}
+				
 				while ( chars_read >= 0 ) {
 					crb_buffer_append_string(client->buffer_in, buf, chars_read);
 					chars_read = read(client->sock_fd, buf, 5);
 				}
 				
-				write(STDIN_FILENO, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
+				write(STDOUT_FILENO, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
+				
+				
+				for (ci = 0; ci < reader->client_count; ci += 1) {
+					if ( reader->clients[ci] && reader->clients[ci]->id != client->id ) {
+						write(reader->clients[ci]->sock_fd, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
+					}
+				}
+				
+				crb_buffer_clear(client->buffer_in);
 			}
 		}
 	}
@@ -88,10 +102,11 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 	struct epoll_event event;
 	
 	reader->clients[reader->client_count] = client;
+	client->id = reader->client_count;
 	reader->client_count++;
 	
 	event.data.ptr = client;
-	event.events = EPOLLIN;
+	event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP;
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
 }
@@ -103,4 +118,22 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	close(client->sock_fd);
+	reader->clients[client->id] = NULL;
+}
+
+void 
+crb_reader_drop_all(crb_reader_t *reader)
+{
+	int ci;
+	struct epoll_event event;
+	
+				
+	for (ci = 0; ci < reader->client_count; ci += 1) {
+		if ( !reader->clients[ci] ) {
+			continue;
+		}
+		epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, reader->clients[ci]->sock_fd, NULL);
+		close(reader->clients[ci]->sock_fd);
+		reader->clients[ci] = NULL;
+	}
 }

@@ -60,3 +60,9 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 	
 	return 0;
 }
+
+int 
+crb_buffer_clear(crb_buffer_t *buffer)
+{
+	buffer->used = 0;
+}

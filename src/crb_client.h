@@ -16,6 +16,7 @@ typedef struct crb_client_s crb_client_t;
 struct crb_client_s {
 	crb_client_state_e state;
 	int sock_fd;
+	int id;
 	
 	crb_buffer_t *buffer_in;
 };

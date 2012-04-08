@@ -37,6 +37,7 @@ main()
 	
 	int sock_desc, r_bind, r_listen, new_desc;
 	int efd;
+	int ci;
 	struct epoll_event event;
 	struct epoll_event *events;
 	struct sockaddr_in address;
@@ -171,6 +172,7 @@ main()
 		
  	}
  	
+ 	crb_reader_drop_all(reader);
  	close(sock_desc);
 
 	return 0;

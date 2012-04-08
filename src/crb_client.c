@@ -21,6 +21,8 @@ crb_client_init()
     	free(client);
     	return NULL;
     }
+    
+    client->id = 0;
 
     return client;
 }
