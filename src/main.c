@@ -23,7 +23,7 @@ check( int value )
 { 
 	if( value < 0 )
 	{
-		perror("\n Error: ");
+		perror("\nError");
   		exit( 1 );
  	}
 }

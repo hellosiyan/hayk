@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -5,6 +7,7 @@
 #include <sys/epoll.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "crb_reader.h"
 #include "crb_buffer.h"
@@ -39,9 +42,17 @@ crb_reader_loop(void *data)
 	struct epoll_event *events;
 	crb_reader_t *reader;
 	crb_client_t *client;
-	char *buf[80];
-	char *buf2[80];
-	buf[79] = '\0';
+	char *buf[4096];
+	buf[4095] = '\0';
+	
+	int dnull = open("/dev/null", O_WRONLY);
+	
+	int pfd[2];
+	int pfd2[2];
+	struct iovec iov;
+	
+	pipe(pfd);
+	pipe(pfd2);
 	
 	reader = (crb_reader_t *) data;
 	events = calloc (10, sizeof (struct epoll_event));
@@ -57,24 +68,29 @@ crb_reader_loop(void *data)
 			} else if (events[i].events & EPOLLIN) {
 				client = (crb_client_t *) events[i].data.ptr;
 				
-				chars_read = read(client->sock_fd, buf, 5);
+				chars_read = read(client->sock_fd, buf, 50);
 				if ( chars_read == 0 ) {
 					continue;
 				}
 				
 				while ( chars_read >= 0 ) {
 					crb_buffer_append_string(client->buffer_in, buf, chars_read);
-					chars_read = read(client->sock_fd, buf, 5);
+					chars_read = read(client->sock_fd, buf, 50);
 				}
 				
-				write(STDOUT_FILENO, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
+				iov.iov_base = client->buffer_in->ptr;
+				iov.iov_len = client->buffer_in->used-1;
 				
+				printf("vmspliced %li\n", vmsplice(pfd[1], &iov, 1, 0));
 				
 				for (ci = 0; ci < reader->client_count; ci += 1) {
 					if ( reader->clients[ci] && reader->clients[ci]->id != client->id ) {
-						write(reader->clients[ci]->sock_fd, client->buffer_in->ptr, strlen(client->buffer_in->ptr));
+						printf("total %li\n", client->buffer_in->used-1);
+						printf("tee %li\n", tee(pfd[0], pfd2[1], client->buffer_in->used-1, 0));
+						printf("splice %li\n", splice(pfd2[0], NULL, reader->clients[ci]->sock_fd, NULL, client->buffer_in->used-1, 0));
 					}
 				}
+				splice(pfd[0], NULL, dnull, NULL, client->buffer_in->used-1, 0);
 				
 				crb_buffer_clear(client->buffer_in);
 			}
@@ -114,10 +130,8 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 void 
 crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 {
-	struct epoll_event event;
-	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
-	close(client->sock_fd);
+	crb_client_close(client); 
 	reader->clients[client->id] = NULL;
 }
 
@@ -133,7 +147,7 @@ crb_reader_drop_all(crb_reader_t *reader)
 			continue;
 		}
 		epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, reader->clients[ci]->sock_fd, NULL);
-		close(reader->clients[ci]->sock_fd);
+		crb_client_close(reader->clients[ci]);
 		reader->clients[ci] = NULL;
 	}
 }

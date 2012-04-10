@@ -22,5 +22,6 @@ struct crb_client_s {
 };
 
 crb_client_t *crb_client_init();
+void crb_client_close(crb_client_t *client);
 
 #endif /* __CRB_CLIENT_H__ */

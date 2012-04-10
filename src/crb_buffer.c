@@ -1,9 +1,10 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "crb_buffer.h"
 
-#define CRB_BUFFER_PIECE_SIZE 2*1024
+#define CRB_BUFFER_PIECE_SIZE 2048
 
 crb_buffer_t *
 crb_buffer_init(size_t size)
@@ -40,8 +41,9 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 		return 0;
 	}
 	
-	if ( buffer->used + str_len >= buffer->size  ) {
-		buffer->size += CRB_BUFFER_PIECE_SIZE;
+	if ( buffer->used + str_len > buffer->size  ) {
+		buffer->size = buffer->used + str_len;
+		buffer->size += CRB_BUFFER_PIECE_SIZE - (buffer->size%CRB_BUFFER_PIECE_SIZE);
 		new_ptr = realloc(buffer->ptr, buffer->size);
 		if ( new_ptr == NULL ) {
 			return -1;
@@ -61,8 +63,19 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 	return 0;
 }
 
-int 
+void 
 crb_buffer_clear(crb_buffer_t *buffer)
 {
 	buffer->used = 0;
 }
+
+void 
+crb_buffer_free(crb_buffer_t *buffer)
+{
+	free(buffer->ptr);
+	buffer->ptr = NULL;
+	buffer->size = 0;
+	buffer->used = 0;
+}
+
+

@@ -3,7 +3,7 @@
 
 #include "crb_client.h"
 
-#define CRB_READER_BUFFER_SIZE 4*1024
+#define CRB_READER_BUFFER_SIZE 4096
 
 crb_client_t *
 crb_client_init()
@@ -25,5 +25,12 @@ crb_client_init()
     client->id = 0;
 
     return client;
+}
+
+void 
+crb_client_close(crb_client_t *client) 
+{
+	close(client->sock_fd);
+	crb_buffer_free(client->buffer_in);
 }
 
