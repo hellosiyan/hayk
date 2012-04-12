@@ -11,6 +11,7 @@
 
 #include "crb_client.h"
 #include "crb_reader.h"
+#include "crb_sender.h"
 
 #define SERVER_PORT 8080
 #define MAX_QUERIES 200

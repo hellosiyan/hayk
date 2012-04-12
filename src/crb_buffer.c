@@ -30,6 +30,29 @@ crb_buffer_init(size_t size)
 	return buffer;
 }
 
+crb_buffer_t *
+crb_buffer_copy(crb_buffer_t *orig)
+{
+	crb_buffer_t *buffer;
+	
+	buffer = malloc(sizeof(crb_buffer_t));
+	if ( buffer == NULL ) {
+		return NULL;
+	}
+	
+	buffer->used = orig->used;
+	buffer->size = orig->size;
+	buffer->size += CRB_BUFFER_PIECE_SIZE - (buffer->size%CRB_BUFFER_PIECE_SIZE);
+	
+	buffer->ptr = malloc(buffer->size);
+	if ( buffer->ptr == NULL ) {
+		free(buffer);
+		return NULL;
+	}
+	
+	return buffer;
+}
+
 
 int 
 crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)

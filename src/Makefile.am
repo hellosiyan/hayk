@@ -11,7 +11,11 @@ caribou_SOURCES =      \
     crb_reader.c       \
     crb_reader.h       \
     crb_worker.c       \
-    crb_worker.h        
+    crb_worker.h       \
+    crb_channel.c      \
+    crb_channel.h      \
+    crb_sender.c       \
+    crb_sender.h       
 
 caribou_CFLAGS =       \
     -DPACKAGE_DATA_DIR=\""$(datadir)"\" \
