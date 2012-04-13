@@ -5,6 +5,7 @@
 #include "crb_list.h"
 #include "crb_reader.h"
 #include "crb_sender.h"
+#include "crb_channel.h"
 
 typedef struct crb_worker_s crb_worker_t;
 struct crb_worker_s {
@@ -19,7 +20,7 @@ struct crb_worker_s {
 void crb_worker_create();
 int crb_worker_run();
 void crb_worker_queue_task();
-int crb_worker_register_channel(char *name);
+crb_channel_t * crb_worker_register_channel(char *name);
 crb_worker_t *crb_worker_get();
 
 #endif /* __CRB_WORKER_H__ */

@@ -120,7 +120,7 @@ crb_worker_queue_task(crb_task_t *task)
 }
 
 
-int
+crb_channel_t *
 crb_worker_register_channel(char *name)
 {
 	crb_worker_t *worker = crb_worker_get();
@@ -128,7 +128,21 @@ crb_worker_register_channel(char *name)
 	
 	channel->name = name;
 	
-	return crb_hash_insert(worker->channels, channel, name, strlen(name));
+	channel = crb_hash_insert(worker->channels, channel, name, strlen(name));
+	
+	return channel;
+}
+
+static void
+crb_worker_on_new_client(crb_client_t *client)
+{
+	crb_worker_t *worker = crb_worker_get();
+	
+	crb_reader_add_client(worker->active_reader, client);
+	
+	/* TODO: remove; begin test code */
+	crb_channel_add_client(crb_worker_register_channel("test"), client);
+	/* end test code */
 }
 
 static void
@@ -159,14 +173,6 @@ crb_worker_sender_pool_init() {
 	}
 	
 	worker->active_sender = (crb_sender_t *)worker->senders->first->data;
-}
-
-static void
-crb_worker_on_new_client(crb_client_t *client)
-{
-	crb_worker_t *worker = crb_worker_get();
-	
-	crb_reader_add_client(worker->active_reader, client);
 }
 
 

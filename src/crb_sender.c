@@ -3,9 +3,11 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-
 #include "crb_sender.h"
 #include "crb_task.h"
+#include "crb_channel.h"
+
+static void crb_sender_task_broadcast(crb_task_t *task);
 
 crb_sender_t *
 crb_sender_init()
@@ -44,7 +46,11 @@ crb_sender_loop(void *data)
 	while (1) {
 		task = crb_task_queue_pop(sender->tasks);
 		if ( task ) {
-			write(STDOUT_FILENO, "task!\n", 6);
+			switch(task->type) {
+				default: 
+					crb_sender_task_broadcast(task);
+					break;
+			}
 		} else {
 			sleep(1);
 		}
@@ -64,3 +70,15 @@ crb_sender_run(crb_sender_t *sender)
 	pthread_create( &(sender->handler), NULL, crb_sender_loop, (void*) sender );
 	
 }
+
+static void
+crb_sender_task_broadcast(crb_task_t *task) {
+	crb_channel_t *channel = task->data;
+	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
+	crb_client_t *client;
+	
+	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
+		printf("\n\nWRITTEN: %u\n\n", write(client->sock_fd, task->buffer->ptr, task->buffer->used-1));
+	}
+}
+

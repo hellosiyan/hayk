@@ -42,7 +42,7 @@ crb_hash_init(ssize_t scale)
     return hash;
 }
 
-int
+void *
 crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 {
 	uint32_t hash_key;
@@ -54,7 +54,6 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 	tmp_item = hash->items[hash_key%hash->scale];
 	if ( tmp_item == NULL ) {
 		// first item is free
-		printf("free\n");
 		new_item = crb_hash_item_init();
 		new_item->key = hash_key;
 		new_item->data = data;
@@ -62,7 +61,6 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 		hash->items[hash_key%hash->scale] = new_item;
 	} else if( tmp_item->key > hash_key ) {
 		// insert before first item
-		printf("before first\n");
 		new_item = crb_hash_item_init();
 		new_item->key = hash_key;
 		new_item->data = data;
@@ -70,10 +68,9 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 		hash->items[hash_key%hash->scale] = new_item;
 	} else {
 		do {
-			printf("loop\n");
 			if ( tmp_item->key == hash_key ) {
 				// duplicate
-				return -1;
+				return tmp_item->data;
 			} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
 				// insert after current item
 				break;
@@ -87,8 +84,44 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 		tmp_item->next = new_item;
 	}
 	
-	return hash_key;
+	return data;
 }
+
+
+crb_hash_cursor_t *
+crb_hash_cursor_init(crb_hash_t *hash)
+{
+	crb_hash_cursor_t *cursor = malloc(sizeof(crb_hash_cursor_t));
+	if ( cursor == NULL ) {
+		return NULL;
+	}
+	
+	cursor->hash = hash;
+	cursor->col = 0;
+	cursor->row = hash->items[0];
+	
+	return cursor;
+}
+
+void *
+crb_hash_cursor_next(crb_hash_cursor_t *cursor)
+{
+	if ( cursor->row != NULL && cursor->row->next != NULL ) {
+		cursor->row = cursor->row->next;
+		return cursor->row->data;
+	}
+	
+	while( cursor->col < cursor->hash->scale ) {
+		cursor->col++;
+		cursor->row = cursor->hash->items[cursor->col];
+		if ( cursor->row != NULL ) {
+			return cursor->row->data;
+		}
+	}
+	
+	return NULL;
+}
+
 
 inline uint32_t 
 rotl32 (uint32_t x, int8_t r)

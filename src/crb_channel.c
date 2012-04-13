@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-
 #include "crb_channel.h"
+#include "crb_hash.h"
 
 crb_channel_t *
 crb_channel_init()
@@ -21,6 +21,8 @@ crb_channel_init()
 		free(channel);
 		return NULL;
     }
+    
+	channel->clients = crb_hash_init(16);
 
     return channel;
 }
@@ -28,8 +30,7 @@ crb_channel_init()
 void 
 crb_channel_add_client(crb_channel_t *channel, crb_client_t *client)
 {
-	
-	channel->clients[channel->client_count] = client;
+	crb_hash_insert(channel->clients, client, &(client->sock_fd), sizeof(int));
 	channel->client_count++;
 }
 

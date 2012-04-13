@@ -50,6 +50,9 @@ crb_buffer_copy(crb_buffer_t *orig)
 		return NULL;
 	}
 	
+	memcpy(buffer->ptr, orig->ptr, orig->size);
+	buffer->ptr[buffer->used - 1] = '\0';
+	
 	return buffer;
 }
 
