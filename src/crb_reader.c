@@ -88,7 +88,7 @@ crb_reader_loop(void *data)
 				}
 				
 				while ( chars_read >= 0 ) {
-					crb_buffer_append_string(client->buffer_in, buf, chars_read);
+					crb_buffer_append_string(client->buffer_in, (const char*)buf, chars_read);
 					chars_read = read(client->sock_fd, buf, 50);
 				}
 				

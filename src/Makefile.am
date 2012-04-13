@@ -16,6 +16,8 @@ caribou_SOURCES =      \
     crb_channel.h      \
     crb_sender.c       \
     crb_sender.h       \
+    crb_hash.c         \
+    crb_hash.h         \
     crb_list.c         \
     crb_list.h         
 

@@ -12,20 +12,29 @@
 #include "crb_worker.h"
 #include "crb_client.h"
 #include "crb_reader.h"
+#include "crb_hash.h"
 #include "crb_list.h"
 
 #define SERVER_PORT 8080
 
 static crb_worker_t *worker;
 
+
+static void crb_worker_reader_pool_init();
+static void crb_worker_on_new_client(crb_client_t *client);
+
 void 
 crb_worker_create()
 {
 	worker = malloc(sizeof(crb_worker_t));
 	
-	worker->channels = crb_list_init(16);
-	worker->readers = crb_list_init(16);
-	worker->senders = crb_list_init(16);
+	worker->channels = crb_hash_init(16);
+	worker->readers = crb_list_init();
+	worker->senders = crb_list_init();
+	
+	worker->active_reader = NULL;
+	
+	crb_worker_reader_pool_init();
 }
 
 crb_worker_t *
@@ -89,7 +98,8 @@ crb_worker_run()
 
 		client = crb_client_init();
 		client->sock_fd = new_desc;
-		crb_reader_add_client(reader, client);
+		
+		crb_worker_on_new_client(client);
 	}
  	
  	crb_reader_drop_all(reader);
@@ -97,4 +107,28 @@ crb_worker_run()
 
 	return 0;
 }
+
+static void
+crb_worker_reader_pool_init() {
+	crb_worker_t *worker = crb_worker_get();
+	crb_reader_t *new_reader;
+	int i;
+	
+	for (i = 0; i < 3; i += 1) {
+		new_reader = crb_reader_init();
+		crb_reader_run(new_reader);
+		crb_list_push(worker->readers, new_reader);
+	}
+	
+	worker->active_reader = (crb_reader_t *)worker->readers->first->data;
+}
+
+static void
+crb_worker_on_new_client(crb_client_t *client)
+{
+	crb_worker_t *worker = crb_worker_get();
+	
+	crb_reader_add_client(worker->active_reader, client);
+}
+
 

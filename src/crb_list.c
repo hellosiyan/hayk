@@ -3,7 +3,7 @@
 #include "crb_list.h"
 
 crb_list_t *
-crb_list_init(ssize_t scale)
+crb_list_init()
 {
     crb_list_t *list;
 
@@ -12,14 +12,52 @@ crb_list_init(ssize_t scale)
         return NULL;
     }
     
-    list->scale = scale;
-    
-    list->items = calloc(scale, sizeof(crb_list_item_t));
-    if ( list->items == NULL ) {
-    	free(list);
-    	return NULL;
-    }
+    list->first = NULL;
+    list->last = NULL;
+    list->length = 0;
 
     return list;
 }
 
+
+void 
+crb_list_push(crb_list_t *list, void *data)
+{
+	crb_list_item_t *item = malloc(sizeof(crb_list_item_t));
+	item->data = data;
+	item->next = NULL;
+	item->prev = list->last;
+	
+	if ( list->last != NULL ) {
+		list->last->next = item;
+	}
+	
+	list->last = item;
+	if ( list->first == NULL ) {
+		list->first = item;
+	}
+}
+
+void 
+crb_list_unshift(crb_list_t *list, void *data)
+{
+	crb_list_item_t *item = malloc(sizeof(crb_list_item_t));
+	item->data = data;
+	item->next = list->first;
+	item->prev = NULL;
+	
+	if ( list->first != NULL ) {
+		list->first->prev = item;
+	}
+	
+	list->first = item;
+	if ( list->last == NULL ) {
+		list->last = item;
+	}
+}
+
+void
+crb_list_remove(crb_list_t *list, void *data)
+{
+	// TODO
+}
