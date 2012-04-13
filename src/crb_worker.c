@@ -12,15 +12,19 @@
 #include "crb_worker.h"
 #include "crb_client.h"
 #include "crb_reader.h"
+#include "crb_sender.h"
+#include "crb_channel.h"
 #include "crb_hash.h"
 #include "crb_list.h"
 
 #define SERVER_PORT 8080
+#define CRB_WORKER_CHANNELS_SCALE 4
 
 static crb_worker_t *worker;
 
 
 static void crb_worker_reader_pool_init();
+static void crb_worker_sender_pool_init();
 static void crb_worker_on_new_client(crb_client_t *client);
 
 void 
@@ -28,13 +32,14 @@ crb_worker_create()
 {
 	worker = malloc(sizeof(crb_worker_t));
 	
-	worker->channels = crb_hash_init(16);
+	worker->channels = crb_hash_init(CRB_WORKER_CHANNELS_SCALE);
 	worker->readers = crb_list_init();
 	worker->senders = crb_list_init();
 	
 	worker->active_reader = NULL;
 	
 	crb_worker_reader_pool_init();
+	crb_worker_sender_pool_init();
 }
 
 crb_worker_t *
@@ -108,6 +113,24 @@ crb_worker_run()
 	return 0;
 }
 
+void
+crb_worker_queue_task(crb_task_t *task)
+{
+	crb_sender_add_task(crb_worker_get()->active_sender, task);
+}
+
+
+int
+crb_worker_register_channel(char *name)
+{
+	crb_worker_t *worker = crb_worker_get();
+	crb_channel_t *channel = crb_channel_init();
+	
+	channel->name = name;
+	
+	return crb_hash_insert(worker->channels, channel, name, strlen(name));
+}
+
 static void
 crb_worker_reader_pool_init() {
 	crb_worker_t *worker = crb_worker_get();
@@ -121,6 +144,21 @@ crb_worker_reader_pool_init() {
 	}
 	
 	worker->active_reader = (crb_reader_t *)worker->readers->first->data;
+}
+
+static void
+crb_worker_sender_pool_init() {
+	crb_worker_t *worker = crb_worker_get();
+	crb_sender_t *new_sender;
+	int i;
+	
+	for (i = 0; i < 3; i += 1) {
+		new_sender = crb_sender_init();
+		crb_sender_run(new_sender);
+		crb_list_push(worker->senders, new_sender);
+	}
+	
+	worker->active_sender = (crb_sender_t *)worker->senders->first->data;
 }
 
 static void

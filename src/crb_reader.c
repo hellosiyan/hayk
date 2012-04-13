@@ -13,11 +13,9 @@
 #include "crb_buffer.h"
 #include "crb_task.h"
 #include "crb_channel.h"
-#include "crb_sender.h"
 
 
 crb_channel_t *channel = NULL;
-crb_sender_t *sender = NULL;
 
 crb_reader_t *
 crb_reader_init()
@@ -41,8 +39,6 @@ crb_reader_init()
 	if ( !channel ) {
 		channel = crb_channel_init();
 		channel->name = "default";
-		sender = crb_sender_init();
-		crb_sender_run(sender);
 	}
 
     return reader;
@@ -114,7 +110,7 @@ crb_reader_loop(void *data)
 				task->data = channel;
 				task->buffer = crb_buffer_copy(client->buffer_in);
 				
-				crb_sender_add_task(sender, task);
+				crb_worker_queue_task(task);
 				
 				crb_buffer_clear(client->buffer_in);
 			}
