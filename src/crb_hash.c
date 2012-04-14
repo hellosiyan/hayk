@@ -122,6 +122,16 @@ crb_hash_cursor_next(crb_hash_cursor_t *cursor)
 	return NULL;
 }
 
+void
+crb_hash_cursor_free(crb_hash_cursor_t *cursor)
+{
+	cursor->hash = NULL;
+	cursor->row = NULL;
+	cursor->col = 0;
+	
+	free(cursor);
+}
+
 
 inline uint32_t 
 rotl32 (uint32_t x, int8_t r)

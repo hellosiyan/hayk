@@ -22,6 +22,17 @@ crb_task_init()
     return task;
 }
 
+void
+crb_task_free(crb_task_t *task)
+{	
+	task->client = NULL;
+	task->buffer = NULL;
+	task->data = NULL;
+	task->prev = NULL;
+	
+	free(task);
+}
+
 crb_task_queue_t *
 crb_task_queue_init()
 {

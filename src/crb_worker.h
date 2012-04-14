@@ -7,8 +7,18 @@
 #include "crb_sender.h"
 #include "crb_channel.h"
 
+typedef enum {
+     CRB_WORKER_INIT = 0,
+     CRB_WORKER_RUNNING,
+     CRB_WORKER_STOPPING,
+     CRB_WORKER_STOPPED
+} crb_worker_state_e;
+
 typedef struct crb_worker_s crb_worker_t;
 struct crb_worker_s {
+	crb_worker_state_e state;
+	int socket_in;
+	
 	crb_hash_t *channels;
 	crb_list_t *readers;
 	crb_list_t *senders;
@@ -19,6 +29,7 @@ struct crb_worker_s {
 
 void crb_worker_create();
 int crb_worker_run();
+int crb_worker_stop();
 void crb_worker_queue_task();
 crb_channel_t * crb_worker_register_channel(char *name);
 crb_worker_t *crb_worker_get();

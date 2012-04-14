@@ -51,6 +51,8 @@ crb_sender_loop(void *data)
 					crb_sender_task_broadcast(task);
 					break;
 			}
+			
+			//crb_task_free(task);
 		} else {
 			sleep(1);
 		}
@@ -78,7 +80,11 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_client_t *client;
 	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
-		printf("\n\nWRITTEN: %u\n\n", write(client->sock_fd, task->buffer->ptr, task->buffer->used-1));
+		if ( client->sock_fd != task->client->sock_fd ) {
+			write(client->sock_fd, task->buffer->ptr, task->buffer->used-1);
+		}
 	}
+	
+	crb_hash_cursor_free(cursor);
 }
 

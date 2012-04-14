@@ -30,6 +30,7 @@ void *crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len);
 
 crb_hash_cursor_t *crb_hash_cursor_init(crb_hash_t *hash);
 void *crb_hash_cursor_next(crb_hash_cursor_t *cursor);
+void crb_hash_cursor_free(crb_hash_cursor_t *cursor);
 
 uint32_t crb_murmurhash3(void * key, int len);
 

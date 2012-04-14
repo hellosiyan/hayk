@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 
 #include "crb_client.h"
 
@@ -31,6 +32,6 @@ void
 crb_client_close(crb_client_t *client) 
 {
 	close(client->sock_fd);
-	crb_buffer_free(client->buffer_in);
+	//crb_buffer_free(client->buffer_in);
 }
 

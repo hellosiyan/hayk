@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/epoll.h>
 #include <errno.h>
 
@@ -26,11 +27,14 @@ static crb_worker_t *worker;
 static void crb_worker_reader_pool_init();
 static void crb_worker_sender_pool_init();
 static void crb_worker_on_new_client(crb_client_t *client);
+static void _crb_worker_stop();
 
 void 
 crb_worker_create()
 {
 	worker = malloc(sizeof(crb_worker_t));
+	
+	worker->state = CRB_WORKER_STOPPED;
 	
 	worker->channels = crb_hash_init(CRB_WORKER_CHANNELS_SCALE);
 	worker->readers = crb_list_init();
@@ -54,10 +58,13 @@ crb_worker_run()
 	int sock_desc, new_desc;
 	int flags;
 	int result;
+	int on = 1;
 	struct sockaddr_in address;
 	
+	worker->state = CRB_WORKER_INIT;
+	
 	crb_client_t *client;
-	crb_reader_t* reader = crb_reader_init();
+	crb_reader_t* reader = worker->active_reader;
 	
 	// listen address
 	address.sin_family = AF_INET;
@@ -65,27 +72,52 @@ crb_worker_run()
 	address.sin_addr.s_addr = INADDR_ANY;
 	
 	sock_desc = socket( AF_INET, SOCK_STREAM, 0 );
+	worker->socket_in = sock_desc;
 	if ( sock_desc == -1 ) {
 		perror("socket");
+		worker->state = CRB_WORKER_STOPPED;
 		return -1;
 	}
+	
+	result = setsockopt(sock_desc, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	
 	result = bind( sock_desc, (struct sockaddr*)&address, sizeof( struct sockaddr_in ) );
 	if ( result == -1 ) {
 		perror("bind");
+		worker->state = CRB_WORKER_STOPPED;
 		return -1;
 	}
 	
 	result = listen( sock_desc, 100 );
 	if ( result == -1 ) {
 		perror("listen");
+		worker->state = CRB_WORKER_STOPPED;
 		return -1;
 	}
 	
-	crb_reader_run(reader);
+	flags = fcntl (sock_desc, F_GETFL, 0);
+	if (flags == -1) {
+		perror ("fcntl");
+		worker->state = CRB_WORKER_STOPPED;
+		return -1;
+	}
+
+	flags |= O_NONBLOCK;
+	result = fcntl (sock_desc, F_SETFL, flags);
+	if (result == -1) {
+		perror ("fcntl");
+		worker->state = CRB_WORKER_STOPPED;
+		return -1;
+	}
 	
-	while (1) {
+	worker->state = CRB_WORKER_RUNNING;
+	
+	while (worker->state == CRB_WORKER_RUNNING) {
 		new_desc = accept( sock_desc, NULL, NULL);
+		if ( new_desc < 0 ) {
+			sleep(1);
+			continue;
+		}
 	
 		flags = fcntl (new_desc, F_GETFL, 0);
 		if (flags == -1) {
@@ -107,10 +139,34 @@ crb_worker_run()
 		crb_worker_on_new_client(client);
 	}
  	
- 	crb_reader_drop_all(reader);
- 	close(sock_desc);
+ 	_crb_worker_stop();
 
 	return 0;
+}
+
+int 
+crb_worker_stop()
+{
+	worker->state = CRB_WORKER_STOPPING;
+}
+
+static void
+_crb_worker_stop()
+{
+	crb_list_item_t *item;
+	crb_reader_t *reader;
+	
+	item = worker->readers->first;
+	while ( item != NULL ) {
+		reader = (crb_reader_t *)item->data;
+		crb_reader_stop(reader);
+		item = item->next;
+		pthread_join(reader->thread_id, NULL);
+	}
+	
+	worker->state = CRB_WORKER_STOPPED;
+	
+	close(worker->socket_in);
 }
 
 void

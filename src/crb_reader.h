@@ -8,6 +8,7 @@
 typedef struct crb_reader_s crb_reader_t;
 
 struct crb_reader_s {
+	pthread_t thread_id;
 	crb_client_t *clients[CRB_READER_MAX_CLIENTS];
 	unsigned client_count;
 	int epoll_fd;
@@ -17,6 +18,7 @@ struct crb_reader_s {
 
 crb_reader_t *crb_reader_init();
 void crb_reader_run(crb_reader_t *reader);
+void crb_reader_stop(crb_reader_t *reader);
 void crb_reader_add_client(crb_reader_t *reader, crb_client_t *client);
 void crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client);
 void crb_reader_drop_all(crb_reader_t *reader);

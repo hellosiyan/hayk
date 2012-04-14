@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/epoll.h>
+#include <sys/socket.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -55,6 +56,7 @@ crb_reader_loop(void *data)
 	char *buf[4096];
 	buf[4095] = '\0';
 	
+	/*
 	int dnull = open("/dev/null", O_WRONLY);
 	
 	int pfd[2];
@@ -63,12 +65,13 @@ crb_reader_loop(void *data)
 	
 	pipe(pfd);
 	pipe(pfd2);
-	
+	*/
 	reader = (crb_reader_t *) data;
 	events = calloc (10, sizeof (struct epoll_event));
 	
-	while(1) {
-		n = epoll_wait (reader->epoll_fd, events, 10, -1);
+	reader->running = 1;
+	while(reader->running) {
+		n = epoll_wait (reader->epoll_fd, events, 10, 500);
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
@@ -88,9 +91,9 @@ crb_reader_loop(void *data)
 					chars_read = read(client->sock_fd, buf, 50);
 				}
 				
+				/*
 				iov.iov_base = client->buffer_in->ptr;
 				iov.iov_len = client->buffer_in->used-1;
-				/*
 				printf("vmspliced %li\n", vmsplice(pfd[1], &iov, 1, 0));
 				
 				for (ci = 0; ci < reader->client_count; ci += 1) {
@@ -102,6 +105,12 @@ crb_reader_loop(void *data)
 				}
 				splice(pfd[0], NULL, dnull, NULL, client->buffer_in->used-1, 0);
 				*/
+				
+				if ( strcmp(client->buffer_in->ptr, "exit") == 0 || strcmp(client->buffer_in->ptr, "exit\n") == 0 ) {
+					//reader->running = 0;
+					printf("STOP commmand recieved\n");
+					crb_worker_stop();
+				}
 				
 				// create task
 				task = crb_task_init();
@@ -116,6 +125,10 @@ crb_reader_loop(void *data)
 			}
 		}
 	}
+	
+	// free(events);
+	
+	printf("reader returned\n");
 
 	return 0;
 }
@@ -123,13 +136,23 @@ crb_reader_loop(void *data)
 void
 crb_reader_run(crb_reader_t *reader)
 {
-	pthread_t handler;
 	if ( reader->running ) {
 		return;
 	}
-		
-	pthread_create( &handler, NULL, crb_reader_loop, (void*) reader );
 	
+	pthread_create( &(reader->thread_id), NULL, crb_reader_loop, (void*) reader );
+	
+}
+
+void
+crb_reader_stop(crb_reader_t *reader)
+{
+	if ( !reader->running ) {
+		return;
+	}
+	
+ 	crb_reader_drop_all(reader);
+	reader->running = 0;
 }
 
 void 
@@ -164,7 +187,6 @@ crb_reader_drop_all(crb_reader_t *reader)
 	int ci;
 	struct epoll_event event;
 	
-				
 	for (ci = 0; ci < reader->client_count; ci += 1) {
 		if ( !reader->clients[ci] ) {
 			continue;
