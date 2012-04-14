@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "crb_task.h"
@@ -64,6 +65,7 @@ crb_task_queue_push(crb_task_queue_t *queue, crb_task_t *task)
 		queue->first = task;
 	}
 	
+	
 	queue->last = task;
 	queue->length ++;
 }
@@ -75,7 +77,11 @@ crb_task_queue_pop(crb_task_queue_t *queue)
 	
 	if ( queue->first != NULL ) {
 		pop = queue->first;
-		queue->first = queue->first->prev;
+		if ( queue->first->prev == NULL ) {
+			queue->first = queue->last = NULL;
+		} else {
+			queue->first = queue->first->prev;
+		}
 		pop->prev = NULL;
 		
 		queue->length --;

@@ -153,20 +153,48 @@ crb_worker_stop()
 static void
 _crb_worker_stop()
 {
-	crb_list_item_t *item;
-	crb_reader_t *reader;
+	{
+		/* Stop and close readers */
+		crb_list_item_t *item;
+		crb_reader_t *reader;
 	
-	item = worker->readers->first;
-	while ( item != NULL ) {
-		reader = (crb_reader_t *)item->data;
-		crb_reader_stop(reader);
-		item = item->next;
-		pthread_join(reader->thread_id, NULL);
+		item = worker->readers->first;
+		while ( item != NULL ) {
+			reader = (crb_reader_t *)item->data;
+			crb_reader_stop(reader);
+			item = item->next;
+			pthread_join(reader->thread_id, NULL);
+		}
+	}
+	{
+		/* Stop and close senders */
+		crb_list_item_t *item;
+		crb_sender_t *sender;
+	
+		item = worker->senders->first;
+		while ( item != NULL ) {
+			sender = (crb_sender_t *)item->data;
+			crb_sender_stop(sender);
+			item = item->next;
+			pthread_join(sender->thread_id, NULL);
+		}
 	}
 	
 	worker->state = CRB_WORKER_STOPPED;
 	
 	close(worker->socket_in);
+	
+	{
+		/* Free channel pool */
+		crb_channel_t *channel;
+		crb_hash_cursor_t *cursor = crb_hash_cursor_init(worker->channels);
+	
+		while ( (channel = crb_hash_cursor_next(cursor)) != NULL ) {
+			crb_channel_free(channel);
+		}
+	
+		crb_hash_cursor_free(cursor);
+	}
 }
 
 void
@@ -180,11 +208,16 @@ crb_channel_t *
 crb_worker_register_channel(char *name)
 {
 	crb_worker_t *worker = crb_worker_get();
-	crb_channel_t *channel = crb_channel_init();
+	crb_channel_t *channel;
 	
-	channel->name = name;
+	channel = crb_hash_exists_key(worker->channels, name, strlen(name));
 	
-	channel = crb_hash_insert(worker->channels, channel, name, strlen(name));
+	if ( channel == NULL ) {
+		channel = crb_channel_init();
+		crb_channel_set_name(channel, name);
+		channel = crb_hash_insert(worker->channels, channel, name, strlen(name));
+	}
+	
 	
 	return channel;
 }

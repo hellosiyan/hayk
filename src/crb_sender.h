@@ -10,14 +10,17 @@
 typedef struct crb_sender_s crb_sender_t;
 
 struct crb_sender_s {
+	pthread_t thread_id;
+	
 	crb_task_queue_t *tasks;
-	pthread_t handler;
+	
 	unsigned running:1;
 };
 
 
 crb_sender_t *crb_sender_init();
 void crb_sender_run(crb_sender_t *sender);
+void crb_sender_stop(crb_sender_t *sender);
 void crb_reader_add_task(crb_sender_t *sender, crb_task_t *task);
 
 #endif /* __CRB_READER_H__ */

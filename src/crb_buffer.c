@@ -102,6 +102,7 @@ crb_buffer_free(crb_buffer_t *buffer)
 	buffer->ptr = NULL;
 	buffer->size = 0;
 	buffer->used = 0;
+	free(buffer);
 }
 
 

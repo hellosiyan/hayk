@@ -87,6 +87,33 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 	return data;
 }
 
+void *
+crb_hash_exists_key(crb_hash_t *hash, void *key, int key_len)
+{
+	uint32_t hash_key;
+	crb_hash_item_t *new_item;
+	crb_hash_item_t *tmp_item;
+	
+	hash_key = crb_murmurhash3(key, key_len);
+	
+	tmp_item = hash->items[hash_key%hash->scale];
+	if ( tmp_item == NULL || tmp_item->key > hash_key ) {
+		return NULL;
+	}
+	
+	do {
+		if ( tmp_item->key == hash_key ) {
+			// found
+			return tmp_item->data;
+		} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
+			// missing
+			break;
+		}
+	} while ( tmp_item->next != NULL && (tmp_item = tmp_item->next) );
+
+	return NULL;
+}
+
 
 crb_hash_cursor_t *
 crb_hash_cursor_init(crb_hash_t *hash)

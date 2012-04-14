@@ -13,10 +13,6 @@
 #include "crb_reader.h"
 #include "crb_buffer.h"
 #include "crb_task.h"
-#include "crb_channel.h"
-
-
-crb_channel_t *channel = NULL;
 
 crb_reader_t *
 crb_reader_init()
@@ -36,11 +32,6 @@ crb_reader_init()
 		free(reader);
 		return NULL;
 	}
-	
-	if ( !channel ) {
-		channel = crb_channel_init();
-		channel->name = "default";
-	}
 
     return reader;
 }
@@ -52,7 +43,6 @@ crb_reader_loop(void *data)
 	struct epoll_event *events;
 	crb_reader_t *reader;
 	crb_client_t *client;
-	crb_task_t *task;
 	char *buf[4096];
 	buf[4095] = '\0';
 	
@@ -113,22 +103,26 @@ crb_reader_loop(void *data)
 				}
 				
 				// create task
-				task = crb_task_init();
-				task->client = client;
-				task->type = CRB_TASK_BROADCAST;
-				task->data = channel;
-				task->buffer = crb_buffer_copy(client->buffer_in);
+				{
+					crb_task_t *task;
+					task = crb_task_init();
+					task->client = client;
+					task->type = CRB_TASK_BROADCAST;
+					// TODO: replace this line
+					task->data = (void *) crb_worker_register_channel("test");
+					task->buffer = crb_buffer_copy(client->buffer_in);
 				
-				crb_worker_queue_task(task);
+					crb_worker_queue_task(task);
 				
-				crb_buffer_clear(client->buffer_in);
+					crb_buffer_clear(client->buffer_in);
+				}
 			}
 		}
 	}
 	
-	// free(events);
+	free(events);
 	
-	printf("reader returned\n");
+	printf("reader closed\n");
 
 	return 0;
 }
@@ -168,9 +162,6 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 	event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP;
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
-	
-	
-	crb_channel_add_client(channel, client);
 }
 
 void 

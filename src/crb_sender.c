@@ -19,6 +19,8 @@ crb_sender_init()
         return NULL;
     }
     
+    sender->running = 0;
+    
     sender->tasks = crb_task_queue_init();
     if ( sender->tasks == NULL ) {
 		free(sender);
@@ -43,7 +45,8 @@ crb_sender_loop(void *data)
 	
 	sender = (crb_sender_t *) data;
 	
-	while (1) {
+	sender->running = 1;
+	while (sender->running) {
 		task = crb_task_queue_pop(sender->tasks);
 		if ( task ) {
 			switch(task->type) {
@@ -51,13 +54,12 @@ crb_sender_loop(void *data)
 					crb_sender_task_broadcast(task);
 					break;
 			}
-			
-			//crb_task_free(task);
 		} else {
 			sleep(1);
 		}
 	}
 	
+	printf("sender closed\n");
 
 	return 0;
 }
@@ -69,8 +71,18 @@ crb_sender_run(crb_sender_t *sender)
 		return;
 	}
 		
-	pthread_create( &(sender->handler), NULL, crb_sender_loop, (void*) sender );
+	pthread_create( &(sender->thread_id), NULL, crb_sender_loop, (void*) sender );
 	
+}
+
+void
+crb_sender_stop(crb_sender_t *sender)
+{
+	if ( !sender->running ) {
+		return;
+	}
+	
+	sender->running = 0;
 }
 
 static void
@@ -86,5 +98,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	}
 	
 	crb_hash_cursor_free(cursor);
+	crb_buffer_free(task->buffer);
+	crb_task_free(task);
 }
 

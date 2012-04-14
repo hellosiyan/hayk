@@ -27,6 +27,7 @@ struct crb_hash_cursor_s {
 
 crb_hash_t *crb_hash_init(ssize_t scale);
 void *crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len);
+void *crb_hash_exists_key(crb_hash_t *hash, void *key, int key_len);
 
 crb_hash_cursor_t *crb_hash_cursor_init(crb_hash_t *hash);
 void *crb_hash_cursor_next(crb_hash_cursor_t *cursor);
