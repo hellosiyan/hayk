@@ -52,7 +52,9 @@ crb_client_unref(crb_client_t *client)
 void 
 crb_client_close(crb_client_t *client) 
 {
+	client->state = CRB_STATE_CLOSING;
 	close(client->sock_fd);
+	client->state = CRB_STATE_CLOSED;
 }
 
 

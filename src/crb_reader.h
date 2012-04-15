@@ -21,6 +21,6 @@ void crb_reader_run(crb_reader_t *reader);
 void crb_reader_stop(crb_reader_t *reader);
 void crb_reader_add_client(crb_reader_t *reader, crb_client_t *client);
 void crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client);
-void crb_reader_drop_all(crb_reader_t *reader);
+void crb_reader_drop_all_clients(crb_reader_t *reader);
 
 #endif /* __CRB_READER_H__ */

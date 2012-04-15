@@ -110,6 +110,40 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 }
 
 void *
+crb_hash_remove(crb_hash_t *hash, void *key, int key_len)
+{
+	uint32_t hash_key;
+	crb_hash_item_t *found_item;
+	crb_hash_item_t *tmp_item;
+	void *data = NULL;
+	
+	hash_key = crb_murmurhash3(key, key_len);
+	
+	tmp_item = hash->items[hash_key%hash->scale];
+	if ( tmp_item == NULL || tmp_item->key > hash_key ) {
+		// missing scale
+	} else if( tmp_item->key == hash_key ) {
+		hash->items[hash_key%hash->scale] = tmp_item->next;
+		
+		data = tmp_item->data;
+		free(tmp_item);
+	} else {
+		while ( tmp_item != NULL ) {
+			if ( tmp_item->next != NULL && tmp_item->next->key == hash_key ) {
+				// found
+				found_item = tmp_item->next;
+				tmp_item->next = tmp_item->next->next;
+				data = found_item->data;
+				free(found_item);
+				break;
+			}
+		}
+	}
+	
+	return data;
+}
+
+void *
 crb_hash_exists_key(crb_hash_t *hash, void *key, int key_len)
 {
 	uint32_t hash_key;

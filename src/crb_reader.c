@@ -65,8 +65,10 @@ crb_reader_loop(void *data)
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
+				printf("drop client\n");
 				client = (crb_client_t *) events[i].data.ptr;
 				crb_reader_drop_client(reader, client);
+				crb_worker_on_client_disconnect(client);
 				continue;
 			} else if (events[i].events & EPOLLIN) {
 				client = (crb_client_t *) events[i].data.ptr;
@@ -145,7 +147,7 @@ crb_reader_stop(crb_reader_t *reader)
 		return;
 	}
 	
- 	crb_reader_drop_all(reader);
+ 	crb_reader_drop_all_clients(reader);
 	reader->running = 0;
 }
 
@@ -169,11 +171,12 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 {
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	crb_client_close(client); 
+	crb_client_unref(client);
 	reader->clients[client->id] = NULL;
 }
 
 void 
-crb_reader_drop_all(crb_reader_t *reader)
+crb_reader_drop_all_clients(crb_reader_t *reader)
 {
 	int ci;
 	struct epoll_event event;
@@ -182,9 +185,6 @@ crb_reader_drop_all(crb_reader_t *reader)
 		if ( !reader->clients[ci] ) {
 			continue;
 		}
-		epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, reader->clients[ci]->sock_fd, NULL);
-		crb_client_close(reader->clients[ci]);
-		crb_client_unref(reader->clients[ci]);
-		reader->clients[ci] = NULL;
+		crb_reader_drop_client(reader, reader->clients[ci]);
 	}
 }

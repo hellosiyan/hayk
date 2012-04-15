@@ -26,7 +26,6 @@ static crb_worker_t *worker;
 
 static void crb_worker_reader_pool_init();
 static void crb_worker_sender_pool_init();
-static void crb_worker_on_new_client(crb_client_t *client);
 static void _crb_worker_stop();
 
 void 
@@ -136,7 +135,7 @@ crb_worker_run()
 		client = crb_client_init();
 		client->sock_fd = new_desc;
 		
-		crb_worker_on_new_client(client);
+		crb_worker_on_client_connect(client);
 	}
  	
  	_crb_worker_stop();
@@ -224,15 +223,21 @@ crb_worker_register_channel(char *name)
 	return channel;
 }
 
-static void
-crb_worker_on_new_client(crb_client_t *client)
+void
+crb_worker_on_client_connect(crb_client_t *client)
 {
-	crb_worker_t *worker = crb_worker_get();
-	
 	crb_reader_add_client(worker->active_reader, client);
 	
 	/* TODO: remove; begin test code */
 	crb_channel_subscribe(crb_worker_register_channel("test"), client);
+	/* end test code */
+}
+
+void
+crb_worker_on_client_disconnect(crb_client_t *client)
+{
+	/* TODO: remove; begin test code */
+	crb_channel_unsubscribe(crb_worker_register_channel("test"), client);
 	/* end test code */
 }
 

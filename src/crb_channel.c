@@ -59,3 +59,11 @@ crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client)
 	channel->client_count++;
 }
 
+void 
+crb_channel_unsubscribe(crb_channel_t *channel, crb_client_t *client)
+{
+	crb_hash_remove(channel->clients, &(client->sock_fd), sizeof(int));
+	crb_client_unref(client);
+	channel->client_count--;
+}
+

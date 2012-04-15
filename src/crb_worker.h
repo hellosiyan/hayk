@@ -34,4 +34,8 @@ void crb_worker_queue_task();
 crb_channel_t * crb_worker_register_channel(char *name);
 crb_worker_t *crb_worker_get();
 
+
+void crb_worker_on_client_connect(crb_client_t *client);
+void crb_worker_on_client_disconnect(crb_client_t *client);
+
 #endif /* __CRB_WORKER_H__ */
