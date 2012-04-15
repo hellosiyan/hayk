@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <errno.h>
 
 #include "crb_sender.h"
 #include "crb_task.h"
@@ -26,7 +28,17 @@ crb_sender_init()
 		free(sender);
 		return NULL;
     }
-
+    
+    sender->mu_tasks = malloc(sizeof(pthread_mutex_t));
+    if ( sender->mu_tasks == NULL ) {
+		free(sender->tasks);
+    	free(sender);
+		return NULL;
+    }
+    pthread_mutex_init(sender->mu_tasks, NULL);
+    
+    sem_init(&sender->sem_tasks, 0, 0);
+    
     return sender;
 }
 
@@ -42,20 +54,24 @@ crb_sender_loop(void *data)
 {
 	crb_sender_t *sender;
 	crb_task_t *task;
+	int result;
 	
 	sender = (crb_sender_t *) data;
 	
 	sender->running = 1;
 	while (sender->running) {
+		result = sem_wait(&sender->sem_tasks);
+		
+		pthread_mutex_lock(sender->mu_tasks);
 		task = crb_task_queue_pop(sender->tasks);
+		pthread_mutex_unlock(sender->mu_tasks);
+		
 		if ( task ) {
 			switch(task->type) {
 				default: 
 					crb_sender_task_broadcast(task);
 					break;
 			}
-		} else {
-			sleep(1);
 		}
 	}
 	
@@ -83,6 +99,7 @@ crb_sender_stop(crb_sender_t *sender)
 	}
 	
 	sender->running = 0;
+	sem_post(&sender->sem_tasks);
 }
 
 static void
@@ -92,7 +109,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_client_t *client;
 	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
-		if ( client->sock_fd != task->client->sock_fd ) {
+		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
 			write(client->sock_fd, task->buffer->ptr, task->buffer->used-1);
 		}
 	}

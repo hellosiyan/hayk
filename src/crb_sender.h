@@ -2,6 +2,7 @@
 #define __CRB_SENDER_H__ 1
 
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "crb_task.h"
 
@@ -13,6 +14,8 @@ struct crb_sender_s {
 	pthread_t thread_id;
 	
 	crb_task_queue_t *tasks;
+	pthread_mutex_t *mu_tasks;
+	sem_t sem_tasks;
 	
 	unsigned running:1;
 };

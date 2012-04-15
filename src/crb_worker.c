@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -9,6 +11,8 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include <signal.h>
+#include <poll.h>
 
 #include "crb_worker.h"
 #include "crb_client.h"
@@ -17,6 +21,7 @@
 #include "crb_channel.h"
 #include "crb_hash.h"
 #include "crb_list.h"
+
 
 #define SERVER_PORT 8080
 #define CRB_WORKER_CHANNELS_SCALE 4
@@ -59,6 +64,7 @@ crb_worker_run()
 	int result;
 	int on = 1;
 	struct sockaddr_in address;
+	struct pollfd pfd; 
 	
 	worker->state = CRB_WORKER_INIT;
 	
@@ -109,12 +115,15 @@ crb_worker_run()
 		return -1;
 	}
 	
+	pfd.fd = sock_desc;
+	pfd.events = POLLIN | POLLOUT | POLLHUP; 
+	
 	worker->state = CRB_WORKER_RUNNING;
 	
 	while (worker->state == CRB_WORKER_RUNNING) {
+		poll(&pfd, 1, -1);
 		new_desc = accept( sock_desc, NULL, NULL);
 		if ( new_desc < 0 ) {
-			sleep(1);
 			continue;
 		}
 	
@@ -147,11 +156,14 @@ int
 crb_worker_stop()
 {
 	worker->state = CRB_WORKER_STOPPING;
+	shutdown(worker->socket_in, SHUT_RDWR);
 }
 
 static void
 _crb_worker_stop()
 {
+	close(worker->socket_in);
+	
 	{
 		/* Stop and close readers */
 		crb_list_item_t *item;
@@ -182,8 +194,6 @@ _crb_worker_stop()
 	
 	worker->state = CRB_WORKER_STOPPED;
 	
-	close(worker->socket_in);
-	
 	{
 		/* Free channel pool */
 		crb_channel_t *channel;
@@ -201,7 +211,12 @@ _crb_worker_stop()
 void
 crb_worker_queue_task(crb_task_t *task)
 {
-	crb_sender_add_task(crb_worker_get()->active_sender, task);
+	crb_sender_t *sender = crb_worker_get()->active_sender;
+	
+	pthread_mutex_lock(sender->mu_tasks);
+	crb_sender_add_task(sender, task);
+	pthread_mutex_unlock(sender->mu_tasks);
+	sem_post(&sender->sem_tasks);
 }
 
 
@@ -226,6 +241,7 @@ crb_worker_register_channel(char *name)
 void
 crb_worker_on_client_connect(crb_client_t *client)
 {
+	client->state = CRB_STATE_OPEN;
 	crb_reader_add_client(worker->active_reader, client);
 	
 	/* TODO: remove; begin test code */

@@ -61,7 +61,7 @@ crb_reader_loop(void *data)
 	
 	reader->running = 1;
 	while(reader->running) {
-		n = epoll_wait (reader->epoll_fd, events, 10, 500);
+		n = epoll_wait (reader->epoll_fd, events, 10, 100);
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
