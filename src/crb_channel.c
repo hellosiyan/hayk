@@ -26,6 +26,17 @@ crb_channel_init()
 void 
 crb_channel_free(crb_channel_t *channel)
 {	
+	/* Free channel pool */
+	crb_client_t *client;
+	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
+
+	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
+		crb_client_unref(client);
+	}
+
+	crb_hash_cursor_free(cursor);
+	crb_hash_free(channel->clients);
+	
 	free(channel->name);
 	free(channel);
 }
@@ -41,9 +52,10 @@ crb_channel_set_name(crb_channel_t *channel, char *name)
 }
 
 void 
-crb_channel_add_client(crb_channel_t *channel, crb_client_t *client)
+crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client)
 {
 	crb_hash_insert(channel->clients, client, &(client->sock_fd), sizeof(int));
+	crb_client_ref(client);
 	channel->client_count++;
 }
 

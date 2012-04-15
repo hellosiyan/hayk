@@ -42,6 +42,28 @@ crb_hash_init(ssize_t scale)
     return hash;
 }
 
+void 
+crb_hash_free(crb_hash_t *hash)
+{
+	int col;
+	crb_hash_item_t *tmp_item;
+	crb_hash_item_t *new_item;
+	
+	// crb_hash_item_t **items;
+	
+	for (col = 0; col < hash->scale; col += 1) {
+		tmp_item = hash->items[col];
+		while ( tmp_item != NULL ) {
+			new_item = tmp_item->next;
+			free(tmp_item);
+			tmp_item = new_item;
+		}
+	}
+	
+	free(hash->items);
+	free(hash);
+}
+
 void *
 crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 {

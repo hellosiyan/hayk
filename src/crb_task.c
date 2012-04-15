@@ -26,12 +26,28 @@ crb_task_init()
 void
 crb_task_free(crb_task_t *task)
 {	
-	task->client = NULL;
+	if ( task->client != NULL ) {
+		crb_client_unref(task->client);
+		task->client = NULL;
+	}
 	task->buffer = NULL;
 	task->data = NULL;
 	task->prev = NULL;
 	
 	free(task);
+}
+
+void 
+crb_task_set_client(crb_task_t *task, crb_client_t *client)
+{
+	if ( task->client == client ) {
+		return;
+	} else if ( task->client != NULL ) {
+		crb_client_unref(task->client);
+	}
+	
+	task->client = client;
+	crb_client_ref(client);
 }
 
 crb_task_queue_t *

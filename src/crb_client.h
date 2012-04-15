@@ -1,6 +1,9 @@
 #ifndef __CRB_CLIENT_H__
 #define __CRB_CLIENT_H__ 1
 
+#include <stdint.h>
+
+
 #include "crb_buffer.h"
 
 
@@ -19,9 +22,13 @@ struct crb_client_s {
 	int id;
 	
 	crb_buffer_t *buffer_in;
+	
+	int ref;
 };
 
 crb_client_t *crb_client_init();
+void crb_client_ref(crb_client_t *client);
+void crb_client_unref(crb_client_t *client);
 void crb_client_close(crb_client_t *client);
 
 #endif /* __CRB_CLIENT_H__ */

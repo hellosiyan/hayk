@@ -18,8 +18,7 @@ struct crb_channel_s {
 crb_channel_t *crb_channel_init();
 void crb_channel_free(crb_channel_t *channel);
 void crb_channel_set_name(crb_channel_t *channel, char *name);
-void crb_channel_add_client(crb_channel_t *channel, crb_client_t *client);
-void crb_channel_add_task(crb_channel_t *channel, crb_task_t *task);
+void crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client);
 void crb_channel_free(crb_channel_t *channel);
 
 #endif /* __CRB_CHANNEL_H__ */

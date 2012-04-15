@@ -166,6 +166,7 @@ _crb_worker_stop()
 			pthread_join(reader->thread_id, NULL);
 		}
 	}
+	
 	{
 		/* Stop and close senders */
 		crb_list_item_t *item;
@@ -194,6 +195,7 @@ _crb_worker_stop()
 		}
 	
 		crb_hash_cursor_free(cursor);
+		crb_hash_free(worker->channels);
 	}
 }
 
@@ -230,7 +232,7 @@ crb_worker_on_new_client(crb_client_t *client)
 	crb_reader_add_client(worker->active_reader, client);
 	
 	/* TODO: remove; begin test code */
-	crb_channel_add_client(crb_worker_register_channel("test"), client);
+	crb_channel_subscribe(crb_worker_register_channel("test"), client);
 	/* end test code */
 }
 

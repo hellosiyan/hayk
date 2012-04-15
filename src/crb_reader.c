@@ -106,7 +106,7 @@ crb_reader_loop(void *data)
 				{
 					crb_task_t *task;
 					task = crb_task_init();
-					task->client = client;
+					crb_task_set_client(task, client);
 					task->type = CRB_TASK_BROADCAST;
 					// TODO: replace this line
 					task->data = (void *) crb_worker_register_channel("test");
@@ -184,6 +184,7 @@ crb_reader_drop_all(crb_reader_t *reader)
 		}
 		epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, reader->clients[ci]->sock_fd, NULL);
 		crb_client_close(reader->clients[ci]);
+		crb_client_unref(reader->clients[ci]);
 		reader->clients[ci] = NULL;
 	}
 }

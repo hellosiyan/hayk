@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <sys/socket.h>
 
 #include "crb_client.h"
 
 #define CRB_READER_BUFFER_SIZE 4096
+
+static void crb_client_free(crb_client_t *client);
 
 crb_client_t *
 crb_client_init()
@@ -24,14 +27,38 @@ crb_client_init()
     }
     
     client->id = 0;
+    
+    client->ref = 1;
 
     return client;
+}
+
+void 
+crb_client_ref(crb_client_t *client)
+{
+	__sync_fetch_and_add( &(client->ref), 1 );
+}
+
+void 
+crb_client_unref(crb_client_t *client)
+{
+	int old_ref;
+	old_ref = __sync_sub_and_fetch( &(client->ref), 1 );
+	if ( old_ref == 0 ) {
+		crb_client_free(client);
+	}
 }
 
 void 
 crb_client_close(crb_client_t *client) 
 {
 	close(client->sock_fd);
-	//crb_buffer_free(client->buffer_in);
 }
 
+
+static void 
+crb_client_free(crb_client_t *client)
+{
+	crb_buffer_free(client->buffer_in);
+	free(client);
+}
