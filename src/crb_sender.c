@@ -68,8 +68,15 @@ crb_sender_loop(void *data)
 		
 		if ( task ) {
 			switch(task->type) {
-				default: 
+				case CRB_TASK_SHUTDOWN:
+					// breaks out of the loop
+					sender->running = 0;
+					crb_task_free(task);
+					break;
+				case CRB_TASK_BROADCAST:
 					crb_sender_task_broadcast(task);
+					break;
+				default: 
 					break;
 			}
 		}
@@ -94,11 +101,18 @@ crb_sender_run(crb_sender_t *sender)
 void
 crb_sender_stop(crb_sender_t *sender)
 {
+	crb_task_t *task;
+	
 	if ( !sender->running ) {
 		return;
 	}
 	
-	sender->running = 0;
+	task = crb_task_init();
+	task->type = CRB_TASK_SHUTDOWN;
+	
+	pthread_mutex_lock(sender->mu_tasks);
+	crb_sender_add_task(sender, task);
+	pthread_mutex_unlock(sender->mu_tasks);
 	sem_post(&sender->sem_tasks);
 }
 

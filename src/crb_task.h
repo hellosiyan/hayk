@@ -6,7 +6,8 @@
 
 typedef enum {
      CRB_TASK_NULL = 0,
-     CRB_TASK_BROADCAST = 10
+     CRB_TASK_BROADCAST,
+     CRB_TASK_SHUTDOWN
 } crb_task_type_e;
 
 typedef struct crb_task_s crb_task_t;
