@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+#include "crb_atomic.h"
 #include "crb_client.h"
 
 #define CRB_READER_BUFFER_SIZE 4096
@@ -36,7 +37,7 @@ crb_client_init()
 void 
 crb_client_ref(crb_client_t *client)
 {
-	__sync_fetch_and_add( &(client->ref), 1 );
+	crb_atomic_fetch_add( &(client->ref), 1 );
 }
 
 void 

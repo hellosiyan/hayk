@@ -19,7 +19,8 @@ caribou_SOURCES =      \
     crb_hash.c         \
     crb_hash.h         \
     crb_list.c         \
-    crb_list.h         
+    crb_list.h         \
+    crb_atomic.h        
 
 caribou_CFLAGS =       \
     -DPACKAGE_DATA_DIR=\""$(datadir)"\" \

@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "crb_hash.h"
+#include "crb_atomic.h"
 
 crb_hash_item_t *
 crb_hash_item_init()
@@ -19,6 +20,12 @@ crb_hash_item_init()
     item->next = NULL;
 
     return item;
+}
+
+void
+crb_hash_item_free(crb_hash_item_t *item)
+{
+   	free(item);
 }
 
 crb_hash_t *
@@ -70,40 +77,53 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 	uint32_t hash_key;
 	crb_hash_item_t *new_item;
 	crb_hash_item_t *tmp_item;
+	int col;
 	
 	hash_key = crb_murmurhash3(key, key_len);
+	col = hash_key%hash->scale;
 	
-	tmp_item = hash->items[hash_key%hash->scale];
+begin_insert:
+	tmp_item = hash->items[col];
 	if ( tmp_item == NULL ) {
 		// first item is free
 		new_item = crb_hash_item_init();
 		new_item->key = hash_key;
 		new_item->data = data;
 		new_item->next = NULL;
-		hash->items[hash_key%hash->scale] = new_item;
+		
+		if ( !crb_atomic_cmp_set(&(hash->items[col]), NULL, new_item) ) {
+			goto begin_insert;
+		}
 	} else if( tmp_item->key > hash_key ) {
 		// insert before first item
 		new_item = crb_hash_item_init();
 		new_item->key = hash_key;
 		new_item->data = data;
 		new_item->next = tmp_item;
-		hash->items[hash_key%hash->scale] = new_item;
+		
+		if ( !crb_atomic_cmp_set(&(hash->items[col]), tmp_item, new_item) ) {
+			goto begin_insert;
+		}
 	} else {
-		do {
-			if ( tmp_item->key == hash_key ) {
-				// duplicate
-				return tmp_item->data;
-			} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
-				// insert after current item
-				break;
-			}
-		} while ( tmp_item->next != NULL && (tmp_item = tmp_item->next) );
-	
 		new_item = crb_hash_item_init();
 		new_item->key = hash_key;
 		new_item->data = data;
-		new_item->next = tmp_item->next;
-		tmp_item->next = new_item;
+		
+		do {
+			tmp_item = hash->items[col];
+			do {
+				if ( tmp_item->key == hash_key ) {
+					// duplicate
+					crb_hash_item_free(new_item);
+					return tmp_item->data;
+				} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
+					// insert after current item
+					break;
+				}
+			} while ( tmp_item->next != NULL && (tmp_item = tmp_item->next) );
+	
+			new_item->next = tmp_item->next;
+		} while( !crb_atomic_cmp_set(&(tmp_item->next), new_item->next, new_item) );
 	}
 	
 	return data;
@@ -189,16 +209,21 @@ crb_hash_cursor_init(crb_hash_t *hash)
 void *
 crb_hash_cursor_next(crb_hash_cursor_t *cursor)
 {
-	if ( cursor->row != NULL && cursor->row->next != NULL ) {
+	void *data;
+	
+	if ( cursor->row != NULL ) {
+		data = cursor->row->data;
 		cursor->row = cursor->row->next;
-		return cursor->row->data;
-	}
+		return data;
+	} 
 	
 	while( cursor->col < cursor->hash->scale ) {
 		cursor->col++;
 		cursor->row = cursor->hash->items[cursor->col];
 		if ( cursor->row != NULL ) {
-			return cursor->row->data;
+			data = cursor->row->data;
+			cursor->row = cursor->row->next;
+			return data;
 		}
 	}
 	
