@@ -22,6 +22,8 @@ struct crb_sender_s {
 
 
 crb_sender_t *crb_sender_init();
+void crb_sender_free(crb_sender_t *sender);
+
 void crb_sender_run(crb_sender_t *sender);
 void crb_sender_stop(crb_sender_t *sender);
 void crb_reader_add_task(crb_sender_t *sender, crb_task_t *task);

@@ -43,6 +43,22 @@ crb_sender_init()
 }
 
 void 
+crb_sender_free(crb_sender_t *sender)
+{
+	crb_sender_stop(sender);
+	
+	pthread_mutex_lock(sender->mu_tasks);
+	crb_task_queue_free(sender->tasks);
+	pthread_mutex_unlock(sender->mu_tasks);
+	
+	pthread_mutex_destroy(sender->mu_tasks);
+	free(sender->mu_tasks);
+	sem_destroy(&sender->sem_tasks);
+	
+	free(sender);
+}
+
+void 
 crb_sender_add_task(crb_sender_t *sender, crb_task_t *task)
 {
 	crb_task_queue_push(sender->tasks, task);
@@ -114,6 +130,10 @@ crb_sender_stop(crb_sender_t *sender)
 	crb_sender_add_task(sender, task);
 	pthread_mutex_unlock(sender->mu_tasks);
 	sem_post(&sender->sem_tasks);
+	
+	pthread_join(sender->thread_id, NULL);
+	
+	sender->running = 0;
 }
 
 static void

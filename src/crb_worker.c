@@ -173,6 +173,7 @@ _crb_worker_stop()
 		while ( item != NULL ) {
 			reader = (crb_reader_t *)item->data;
 			crb_reader_stop(reader);
+			crb_reader_free(reader);
 			item = item->next;
 			pthread_join(reader->thread_id, NULL);
 		}
@@ -187,8 +188,8 @@ _crb_worker_stop()
 		while ( item != NULL ) {
 			sender = (crb_sender_t *)item->data;
 			crb_sender_stop(sender);
+			crb_sender_free(sender);
 			item = item->next;
-			pthread_join(sender->thread_id, NULL);
 		}
 	}
 	

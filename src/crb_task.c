@@ -67,6 +67,16 @@ crb_task_queue_init()
     return queue;
 }
 
+void
+crb_task_queue_free(crb_task_queue_t *queue)
+{	
+	while( crb_task_queue_pop(queue) ) {
+		// pass
+	}
+	
+	free(queue);
+}
+
 
 void 
 crb_task_queue_push(crb_task_queue_t *queue, crb_task_t *task)

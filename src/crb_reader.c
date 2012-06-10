@@ -36,6 +36,13 @@ crb_reader_init()
     return reader;
 }
 
+void 
+crb_reader_free(crb_reader_t *reader)
+{
+	crb_reader_stop(reader);
+	free(reader);
+}
+
 static void* 
 crb_reader_loop(void *data)
 {

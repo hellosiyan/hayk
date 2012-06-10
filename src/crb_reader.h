@@ -17,6 +17,8 @@ struct crb_reader_s {
 
 
 crb_reader_t *crb_reader_init();
+void crb_reader_free(crb_reader_t *reader);
+
 void crb_reader_run(crb_reader_t *reader);
 void crb_reader_stop(crb_reader_t *reader);
 void crb_reader_add_client(crb_reader_t *reader, crb_client_t *client);

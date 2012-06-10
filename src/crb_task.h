@@ -36,6 +36,7 @@ void crb_task_free(crb_task_t *task);
 void crb_task_set_client(crb_task_t *task, crb_client_t *client);
 
 crb_task_queue_t *crb_task_queue_init();
+void crb_task_queue_free(crb_task_queue_t *queue);
 void crb_task_queue_push(crb_task_queue_t *queue, crb_task_t *task);
 crb_task_t * crb_task_queue_pop(crb_task_queue_t *queue);
 
