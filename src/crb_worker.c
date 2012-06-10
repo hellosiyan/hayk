@@ -169,13 +169,11 @@ _crb_worker_stop()
 		crb_list_item_t *item;
 		crb_reader_t *reader;
 	
-		item = worker->readers->first;
-		while ( item != NULL ) {
-			reader = (crb_reader_t *)item->data;
+		reader = (crb_reader_t *) crb_list_pop(worker->readers);
+		while ( reader != NULL ) {
 			crb_reader_stop(reader);
 			crb_reader_free(reader);
-			item = item->next;
-			pthread_join(reader->thread_id, NULL);
+			reader = (crb_reader_t *) crb_list_pop(worker->readers);
 		}
 	}
 	
@@ -183,13 +181,12 @@ _crb_worker_stop()
 		/* Stop and close senders */
 		crb_list_item_t *item;
 		crb_sender_t *sender;
-	
-		item = worker->senders->first;
-		while ( item != NULL ) {
-			sender = (crb_sender_t *)item->data;
+		
+		sender = (crb_sender_t *) crb_list_pop(worker->senders); // worker->senders->first;
+		while ( sender != NULL ) {
 			crb_sender_stop(sender);
 			crb_sender_free(sender);
-			item = item->next;
+			sender = (crb_sender_t *) crb_list_pop(worker->senders);
 		}
 	}
 	

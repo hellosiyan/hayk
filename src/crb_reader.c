@@ -155,6 +155,11 @@ crb_reader_stop(crb_reader_t *reader)
 	}
 	
  	crb_reader_drop_all_clients(reader);
+	
+	reader->running = 0;
+	
+	pthread_join(reader->thread_id, NULL);
+ 	
 	reader->running = 0;
 }
 
