@@ -24,5 +24,6 @@ AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h])
 AC_CHECK_FUNCS([inet_ntoa socket])
 
 AC_CONFIG_FILES([Makefile
-				 src/Makefile])
+				 src/Makefile
+				 tools/Makefile])
 AC_OUTPUT
