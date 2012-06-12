@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include "crb_atomic.h"
 #include "crb_reader.h"
 #include "crb_buffer.h"
 #include "crb_task.h"
@@ -24,6 +25,7 @@ crb_reader_init()
         return NULL;
     }
     
+	reader->clients = crb_hash_init(CRB_READER_CLIENTS_SCALE);
     reader->running = 0;
     reader->client_count = 0;
     
@@ -40,6 +42,7 @@ void
 crb_reader_free(crb_reader_t *reader)
 {
 	crb_reader_stop(reader);
+	crb_hash_free(reader->clients);
 	free(reader);
 }
 
@@ -85,7 +88,7 @@ crb_reader_loop(void *data)
 					continue;
 				}
 				
-				while ( chars_read >= 0 ) {
+				while ( chars_read > 0 ) {
 					crb_buffer_append_string(client->buffer_in, (const char*)buf, chars_read);
 					chars_read = read(client->sock_fd, buf, 50);
 				}
@@ -168,9 +171,10 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 {
 	struct epoll_event event;
 	
-	reader->clients[reader->client_count] = client;
 	client->id = reader->client_count;
-	reader->client_count++;
+	crb_atomic_fetch_add( &(reader->client_count), 1 );
+	
+	crb_hash_insert(reader->clients, client, &(client->id), sizeof(int));
 	
 	event.data.ptr = client;
 	event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP;
@@ -184,19 +188,19 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	crb_client_close(client); 
 	crb_client_unref(client);
-	reader->clients[client->id] = NULL;
+	
+	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
 }
 
 void 
 crb_reader_drop_all_clients(crb_reader_t *reader)
 {
-	int ci;
-	struct epoll_event event;
-	
-	for (ci = 0; ci < reader->client_count; ci += 1) {
-		if ( !reader->clients[ci] ) {
-			continue;
-		}
-		crb_reader_drop_client(reader, reader->clients[ci]);
+	crb_client_t *client;
+	crb_hash_cursor_t *cursor = crb_hash_cursor_init(reader->clients);
+
+	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
+		crb_reader_drop_client(reader, client);
 	}
+
+	crb_hash_cursor_free(cursor);
 }
