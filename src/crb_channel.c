@@ -18,7 +18,7 @@ crb_channel_init()
     channel->name = NULL;
     channel->client_count = 0;
     
-	channel->clients = crb_hash_init(1);
+	channel->clients = crb_hash_init(4);
 
     return channel;
 }

@@ -8,7 +8,6 @@
 #define CRB_CHANNEL_MAX_CLIENTS 10
 
 typedef struct crb_channel_s crb_channel_t;
-
 struct crb_channel_s {
 	char *name;
 	crb_hash_t *clients;

@@ -68,7 +68,6 @@ crb_worker_run()
 	
 	worker->state = CRB_WORKER_INIT;
 	
-	crb_client_t *client;
 	crb_reader_t* reader = worker->active_reader;
 	
 	// listen address
@@ -141,10 +140,13 @@ crb_worker_run()
 			continue;
 		}
 
-		client = crb_client_init();
-		client->sock_fd = new_desc;
+		{
+			crb_client_t *client;
+			client = crb_client_init();
+			client->sock_fd = new_desc;
 		
-		crb_worker_on_client_connect(client);
+			crb_worker_on_client_connect(client);
+		}
 	}
  	
  	_crb_worker_stop();
@@ -216,7 +218,6 @@ crb_worker_queue_task(crb_task_t *task)
 	pthread_mutex_unlock(sender->mu_tasks);
 	sem_post(&sender->sem_tasks);
 }
-
 
 crb_channel_t *
 crb_worker_register_channel(char *name)

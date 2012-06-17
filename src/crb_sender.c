@@ -81,7 +81,6 @@ crb_sender_loop(void *data)
 		pthread_mutex_lock(sender->mu_tasks);
 		task = crb_task_queue_pop(sender->tasks);
 		pthread_mutex_unlock(sender->mu_tasks);
-		
 		if ( task ) {
 			switch(task->type) {
 				case CRB_TASK_SHUTDOWN:
@@ -97,8 +96,6 @@ crb_sender_loop(void *data)
 			}
 		}
 	}
-	
-	printf("sender closed\n");
 
 	return 0;
 }

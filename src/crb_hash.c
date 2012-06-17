@@ -5,6 +5,10 @@
 #include "crb_hash.h"
 #include "crb_atomic.h"
 
+void crb_hash_item_ref(crb_hash_item_t *item);
+void crb_hash_item_unref(crb_hash_item_t *item);
+void crb_hash_item_free(crb_hash_item_t *item);
+
 crb_hash_item_t *
 crb_hash_item_init()
 {
@@ -18,20 +22,18 @@ crb_hash_item_init()
     item->key = 0;
     item->data = NULL;
     item->next = NULL;
+    
+    item->ref = 1;
 
     return item;
-}
-
-void
-crb_hash_item_free(crb_hash_item_t *item)
-{
-   	free(item);
 }
 
 crb_hash_t *
 crb_hash_init(ssize_t scale)
 {
     crb_hash_t *hash;
+    crb_hash_item_t *tmp;
+    int i;
 
     hash = malloc(sizeof(crb_hash_t));
     if (hash == NULL) {
@@ -40,7 +42,8 @@ crb_hash_init(ssize_t scale)
     
     hash->scale = scale;
     
-    hash->items = calloc(scale, sizeof(crb_hash_item_t));
+    hash->items = calloc(scale, sizeof(crb_hash_item_t*));
+        
     if ( hash->items == NULL ) {
     	free(hash);
     	return NULL;
@@ -62,7 +65,7 @@ crb_hash_free(crb_hash_t *hash)
 		tmp_item = hash->items[col];
 		while ( tmp_item != NULL ) {
 			new_item = tmp_item->next;
-			free(tmp_item);
+			crb_hash_item_unref(tmp_item);
 			tmp_item = new_item;
 		}
 	}
@@ -146,7 +149,7 @@ crb_hash_remove(crb_hash_t *hash, void *key, int key_len)
 		hash->items[hash_key%hash->scale] = tmp_item->next;
 		
 		data = tmp_item->data;
-		free(tmp_item);
+		crb_hash_item_unref(tmp_item);
 	} else {
 		while ( tmp_item != NULL ) {
 			if ( tmp_item->next != NULL && tmp_item->next->key == hash_key ) {
@@ -154,7 +157,7 @@ crb_hash_remove(crb_hash_t *hash, void *key, int key_len)
 				found_item = tmp_item->next;
 				tmp_item->next = tmp_item->next->next;
 				data = found_item->data;
-				free(found_item);
+				crb_hash_item_unref(found_item);
 				break;
 			}
 		}
@@ -202,6 +205,9 @@ crb_hash_cursor_init(crb_hash_t *hash)
 	cursor->hash = hash;
 	cursor->col = 0;
 	cursor->row = hash->items[0];
+	if ( cursor->row != NULL ) {
+		crb_hash_item_ref(cursor->row);
+	}
 	
 	return cursor;
 }
@@ -210,19 +216,30 @@ void *
 crb_hash_cursor_next(crb_hash_cursor_t *cursor)
 {
 	void *data;
+	crb_hash_item_t *tmp_item;
 	
 	if ( cursor->row != NULL ) {
 		data = cursor->row->data;
-		cursor->row = cursor->row->next;
+		if ( cursor->row->next != NULL ) {
+			crb_hash_item_ref(cursor->row->next);
+		}
+		tmp_item = cursor->row->next;
+		crb_hash_item_unref(cursor->row);
+		cursor->row = tmp_item;
 		return data;
 	} 
 	
-	while( cursor->col < cursor->hash->scale ) {
+	while( cursor->col < cursor->hash->scale-1 ) {
 		cursor->col++;
 		cursor->row = cursor->hash->items[cursor->col];
 		if ( cursor->row != NULL ) {
+			if ( cursor->row->next != NULL ) {
+				crb_hash_item_ref(cursor->row->next);
+			}
+			tmp_item = cursor->row->next;
 			data = cursor->row->data;
-			cursor->row = cursor->row->next;
+			//crb_hash_item_unref(cursor->row);
+			cursor->row = tmp_item;
 			return data;
 		}
 	}
@@ -234,10 +251,38 @@ void
 crb_hash_cursor_free(crb_hash_cursor_t *cursor)
 {
 	cursor->hash = NULL;
-	cursor->row = NULL;
 	cursor->col = 0;
 	
+	if ( cursor->row != NULL ) {
+		crb_hash_item_unref(cursor->row);
+		cursor->row = NULL;
+	}
+	
 	free(cursor);
+}
+
+inline void
+crb_hash_item_ref(crb_hash_item_t *item)
+{
+	crb_atomic_fetch_add( &(item->ref), 1 );
+}
+
+inline void
+crb_hash_item_unref(crb_hash_item_t *item)
+{
+	int old_ref;
+	old_ref = __sync_sub_and_fetch( &(item->ref), 1 );
+	if ( old_ref == 0 ) {
+		crb_hash_item_free(item);
+	}
+}
+
+void
+crb_hash_item_free(crb_hash_item_t *item)
+{
+	item->next = item->data = NULL;
+	item->key = 0;
+	free(item);
 }
 
 

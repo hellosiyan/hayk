@@ -1,8 +1,10 @@
 #ifndef __CRB_READER_H__
 #define __CRB_READER_H__ 1
 
+#include "crb_worker.h"
 #include "crb_hash.h"
 #include "crb_client.h"
+#include "crb_channel.h"
 
 #define CRB_READER_CLIENTS_SCALE 4
 

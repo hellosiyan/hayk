@@ -50,6 +50,24 @@ crb_task_set_client(crb_task_t *task, crb_client_t *client)
 	crb_client_ref(client);
 }
 
+void 
+crb_task_set_buffer(crb_task_t *task, crb_buffer_t *buffer)
+{
+	task->buffer = buffer;
+}
+
+void 
+crb_task_set_data(crb_task_t *task, void *data)
+{
+	task->data = data;
+}
+
+void 
+crb_task_set_type(crb_task_t *task, crb_task_type_e type)
+{
+	task->type = type;
+}
+
 crb_task_queue_t *
 crb_task_queue_init()
 {

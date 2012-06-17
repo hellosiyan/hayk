@@ -10,10 +10,12 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include "crb_worker.h"
 #include "crb_atomic.h"
 #include "crb_reader.h"
 #include "crb_buffer.h"
 #include "crb_task.h"
+#include "crb_channel.h"
 
 crb_reader_t *
 crb_reader_init()
@@ -84,6 +86,7 @@ crb_reader_loop(void *data)
 				client = (crb_client_t *) events[i].data.ptr;
 				
 				chars_read = read(client->sock_fd, buf, 50);
+				
 				if ( chars_read == 0 ) {
 					continue;
 				}
@@ -119,10 +122,11 @@ crb_reader_loop(void *data)
 					crb_task_t *task;
 					task = crb_task_init();
 					crb_task_set_client(task, client);
-					task->type = CRB_TASK_BROADCAST;
+					crb_task_set_type(task, CRB_TASK_BROADCAST);
+					crb_task_set_buffer(task, crb_buffer_copy(client->buffer_in));
 					// TODO: replace this line
-					task->data = (void *) crb_worker_register_channel("test");
-					task->buffer = crb_buffer_copy(client->buffer_in);
+					
+					crb_task_set_data(task, (void*)crb_worker_register_channel("test"));
 				
 					crb_worker_queue_task(task);
 				
@@ -133,8 +137,6 @@ crb_reader_loop(void *data)
 	}
 	
 	free(events);
-	
-	printf("reader closed\n");
 
 	return 0;
 }

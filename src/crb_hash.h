@@ -9,6 +9,8 @@ struct crb_hash_item_s {
 	crb_hash_item_t *next;
 	uint32_t key;
 	void *data;
+	
+	int ref;
 };
 
 typedef struct crb_hash_s crb_hash_t;

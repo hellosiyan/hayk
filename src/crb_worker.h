@@ -3,6 +3,7 @@
 
 #include "crb_hash.h"
 #include "crb_list.h"
+#include "crb_channel.h"
 #include "crb_reader.h"
 #include "crb_sender.h"
 #include "crb_channel.h"
@@ -27,15 +28,16 @@ struct crb_worker_s {
 	crb_sender_t *active_sender;
 };
 
+
 void crb_worker_create();
 int crb_worker_run();
 int crb_worker_stop();
 void crb_worker_queue_task();
-crb_channel_t * crb_worker_register_channel(char *name);
+crb_channel_t *crb_worker_register_channel(char *name);
 crb_worker_t *crb_worker_get();
-
 
 void crb_worker_on_client_connect(crb_client_t *client);
 void crb_worker_on_client_disconnect(crb_client_t *client);
+
 
 #endif /* __CRB_WORKER_H__ */
