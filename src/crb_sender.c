@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "crb_sender.h"
 #include "crb_task.h"
@@ -81,6 +82,7 @@ crb_sender_loop(void *data)
 		pthread_mutex_lock(sender->mu_tasks);
 		task = crb_task_queue_pop(sender->tasks);
 		pthread_mutex_unlock(sender->mu_tasks);
+		
 		if ( task ) {
 			switch(task->type) {
 				case CRB_TASK_SHUTDOWN:
@@ -138,10 +140,23 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_channel_t *channel = task->data;
 	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
 	crb_client_t *client;
+	crb_buffer_t *buffer = task->buffer;
+	ssize_t buffer_offset = 0;
+	ssize_t buffer_size = buffer->used-1;
+	int bytes_written;
 	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
 		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
-			write(client->sock_fd, task->buffer->ptr, task->buffer->used-1);
+			bytes_written = write(client->sock_fd, buffer->ptr + buffer_offset, buffer_size);
+			while (bytes_written > 0 && bytes_written < buffer_size) {
+				buffer_offset += bytes_written;
+				buffer_size -= bytes_written;
+				
+				do {
+					errno == 0;
+					bytes_written = write(client->sock_fd, buffer->ptr + buffer_offset, buffer_size);
+				} while (bytes_written == -1 && errno == 11);
+			}
 		}
 	}
 	

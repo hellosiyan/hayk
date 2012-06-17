@@ -29,6 +29,19 @@
 static crb_worker_t *worker;
 
 
+typedef struct {
+	int signo;
+	void (*handler)(int signo);
+} crb_signal_t;
+
+
+crb_signal_t  signals[] = {
+    { SIGPIPE, SIG_IGN },
+    { 0, NULL }
+};
+
+
+static void crb_worker_signals_init();
 static void crb_worker_reader_pool_init();
 static void crb_worker_sender_pool_init();
 static void _crb_worker_stop();
@@ -256,8 +269,26 @@ crb_worker_on_client_disconnect(crb_client_t *client)
 	/* end test code */
 }
 
+
+static void 
+crb_worker_signals_init()
+{
+    crb_signal_t      *sig;
+    struct sigaction   sa;
+
+    for (sig = signals; sig->signo != 0; sig++) {
+        memset(&sa, 0, sizeof(struct sigaction));
+        sa.sa_handler = sig->handler;
+        sigemptyset(&sa.sa_mask);
+        if (sigaction(sig->signo, &sa, NULL) == -1) {
+            break;
+        }
+    }
+}
+
 static void
-crb_worker_reader_pool_init() {
+crb_worker_reader_pool_init()
+{
 	crb_worker_t *worker = crb_worker_get();
 	crb_reader_t *new_reader;
 	int i;
@@ -272,7 +303,8 @@ crb_worker_reader_pool_init() {
 }
 
 static void
-crb_worker_sender_pool_init() {
+crb_worker_sender_pool_init()
+{
 	crb_worker_t *worker = crb_worker_get();
 	crb_sender_t *new_sender;
 	int i;
@@ -285,5 +317,3 @@ crb_worker_sender_pool_init() {
 	
 	worker->active_sender = (crb_sender_t *)worker->senders->first->data;
 }
-
-

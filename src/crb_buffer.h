@@ -10,6 +10,7 @@ struct crb_buffer_s {
 	char *ptr;
 	
 	size_t used;
+	size_t offset;
 	size_t size;
 };
 

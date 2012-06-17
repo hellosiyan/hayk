@@ -17,6 +17,7 @@ crb_buffer_init(size_t size)
 	}
 	
 	buffer->used = 0;
+	buffer->offset = 0;
 	buffer->size = size;
 	
 	buffer->ptr = malloc(size);
