@@ -62,6 +62,7 @@ crb_client_close(crb_client_t *client)
 static void 
 crb_client_free(crb_client_t *client)
 {
+	crb_client_close(client);
 	crb_buffer_free(client->buffer_in);
 	free(client);
 }

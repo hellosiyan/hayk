@@ -73,11 +73,10 @@ crb_reader_loop(void *data)
 	
 	reader->running = 1;
 	while(reader->running) {
-		n = epoll_wait (reader->epoll_fd, events, 10, 100);
+		n = epoll_wait (reader->epoll_fd, events, 10, 1000);
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
-				printf("drop client\n");
 				client = (crb_client_t *) events[i].data.ptr;
 				crb_reader_drop_client(reader, client);
 				crb_worker_on_client_disconnect(client);
@@ -188,7 +187,6 @@ void
 crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 {
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
-	crb_client_close(client); 
 	crb_client_unref(client);
 	
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));

@@ -46,8 +46,8 @@ crb_task_set_client(crb_task_t *task, crb_client_t *client)
 		crb_client_unref(task->client);
 	}
 	
-	task->client = client;
 	crb_client_ref(client);
+	task->client = client;
 }
 
 void 

@@ -159,6 +159,11 @@ crb_hash_remove(crb_hash_t *hash, void *key, int key_len)
 				data = found_item->data;
 				crb_hash_item_unref(found_item);
 				break;
+			} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
+				tmp_item = tmp_item->next;
+			} else {
+				// not found
+				break;
 			}
 		}
 	}
