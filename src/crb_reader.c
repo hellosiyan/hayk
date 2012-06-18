@@ -19,6 +19,9 @@
 #include "crb_request.h"
 
 
+#define crb_strcmp2(s, c0, c1) \
+    s[0] == c0 && s[1] == c1
+    
 #define crb_strcmp3(s, c0, c1, c2) \
     s[0] == c0 && s[1] == c1 && s[2] == c2
     
@@ -29,6 +32,7 @@
 
 static void crb_reader_on_data(crb_reader_t *reader, crb_client_t *client);
 static int crb_reader_parse_request(crb_client_t *client);
+static int crb_reader_validate_request(crb_client_t *client);
 
 crb_reader_t *
 crb_reader_init()
@@ -106,24 +110,6 @@ crb_reader_loop(void *data)
 				}
 				
 				crb_reader_on_data(reader, client);
-				
-				/*
-				// create task
-				{
-					crb_task_t *task;
-					task = crb_task_init();
-					crb_task_set_client(task, client);
-					crb_task_set_type(task, CRB_TASK_BROADCAST);
-					crb_task_set_buffer(task, crb_buffer_copy(client->buffer_in));
-					// TODO: replace this line
-					
-					crb_task_set_data(task, (void*)crb_worker_register_channel("test"));
-				
-					crb_worker_queue_task(task);
-				
-					crb_buffer_clear(client->buffer_in);
-				}
-				*/
 			}
 		}
 	}
@@ -224,6 +210,9 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				crb_client_set_request(client, NULL);
 				client->buffer_in->rpos = client->buffer_in->ptr;
 			} else if( result == CRB_PARSE_HEADER_DONE ) {
+				// Validate handshake
+				result = crb_reader_validate_request(client);
+				
 				// Send handshake response
 				crb_task_t *task;
 				task = crb_task_init();
@@ -242,15 +231,15 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 	
 }
 
-int
+static int
 crb_reader_parse_request(crb_client_t *client)
 {
 	crb_buffer_t *b;
 	char c, ch, *p, *last;
-	char *left, *right;
-	char *header_name, *header_value;
+	char *left, *right, *header_name;
 	crb_request_t *request;
 	int is_cr, is_crlf, trailing_ws = 0;
+	ssize_t header_name_length;
 	
 	if ( client->request == NULL ) {
 		request = crb_request_init();
@@ -288,13 +277,13 @@ crb_reader_parse_request(crb_client_t *client)
     for (; b->rpos < last; b->rpos++) {
     	p = b->rpos;
     	ch = *p;
-    	printf("( %c ) %i\n", ch, state);
+    	// printf("( %c ) %i\n", ch, state);
     	
     	switch(state) {
     		case sw_start:
     			left = p;
     			
-		        if (ch == 10 || ch == 13 || ch == 0) {
+		        if (ch == '\n' || ch == '\r' || ch == 0) {
 		            break;
 		        }
 
@@ -348,8 +337,8 @@ crb_reader_parse_request(crb_client_t *client)
 				        crb_request_set_uri(request, left, right-left);
 				        state = sw_spaces_before_http;
 				        break;
-				    case 10:
-				    case 13:
+				    case '\n':
+				    case '\r':
 				    case '\0':
 				    	printf("INVALID REQUEST 2\n");
 				        return CRB_ERROR_INVALID_REQUEST;
@@ -391,11 +380,11 @@ crb_reader_parse_request(crb_client_t *client)
 		    case sw_header_crlf:
 		    	trailing_ws = 0;
     			switch(ch) {
-    				case 13: // CR
-    				case 10: // LF
+    				case '\r':
+    				case '\n':
     					break;
-    				case 32: // SP
-    				case 9: // HT
+    				case ' ':
+    				case '\t':
     					state = sw_header_lws;
     					break;
     				default:
@@ -407,10 +396,10 @@ crb_reader_parse_request(crb_client_t *client)
 		    case sw_header_lws:
 		    	trailing_ws = 0;
     			switch(ch) {
-    				case 13: // CR
+    				case '\r':
     					// is_cr = 1;break;
     					break;
-    				case 10: // LF
+    				case '\n':
     					if ( is_crlf ) {
 							printf("END OF TRANSMISSION\n");
 							return;
@@ -418,8 +407,8 @@ crb_reader_parse_request(crb_client_t *client)
 							is_crlf = 1;
     					}
     					break;
-    				case 32: // SP
-    				case 9: // HT
+    				case ' ':
+    				case '\t':
     					is_crlf = 0;
     					state = sw_header_value;
     					break;
@@ -448,31 +437,33 @@ crb_reader_parse_request(crb_client_t *client)
     				case '=':
     				case '{':
     				case '}':
-    				case 13: // CR
-    				case 10: // LF
-    				case 32: // SP
-    				case 9: // HT
+    				case '\r':
+    				case '\n':
+    				case ' ':
+    				case '\t':
     					// separators, not allowed in header name token
 						printf("INVALID REQUEST: Wrong header name format\n");
 					    return CRB_ERROR_INVALID_REQUEST;
     				case ':':
     					// end of name
     					right = p;
-				        header_name = calloc(1, right-left+1);
-				        memcpy(header_name, left, right-left);
-				        printf("HEADER NAME:\t\t{{%s}}\n", header_name);
+    					header_name = left;
+    					header_name_length = right-left;
+				        // printf("HEADER NAME:\t\t{{%s}}\n", header_name);
 				        state = sw_header_separator;
 				        break;
+				    default:
+				    	*(b->rpos) = toupper(ch);
     			}
     			break;
 		    case sw_header_separator:
     			switch(ch) {
-    				case 32: // SP
-    				case 9: // HT
+    				case ' ':
+    				case '\t':
     					break;
-    				case 13: // CR
+    				case '\r':
     					break;
-    				case 10: // LF
+    				case '\n':
     					is_crlf = 1;
 				        state = sw_header_lws;
     					break;
@@ -484,29 +475,17 @@ crb_reader_parse_request(crb_client_t *client)
     			break;
 		    case sw_header_value:
     			switch(ch) {
-    				case 13: // CR
+    				case '\r':
     					trailing_ws++;
     					//is_cr = 1;
     					break;
-    				case 10: // LF
+    				case '\n':
 						if(is_crlf) {
 							right = p - trailing_ws;
 							trailing_ws = 0;
-							
-						    header_value = calloc(1, right-left+1);
-						    memcpy(header_value, left, right-left);
-						    printf("HEADER VALUE:\t\t{{%s}}\n", header_value);
 						    
-						    crb_request_add_header(request, header_name, header_value);
+						    crb_request_add_header(request, header_name, header_name_length, left, right-left);
 						    
-						    if ( header_name != NULL ) {
-								free(header_name);
-								header_name = NULL;
-						    }
-						    
-						    free(header_value);
-						    header_value = NULL;
-							
 							printf("END OF TRANSMISSION\n");
 							return CRB_PARSE_HEADER_DONE;
 						} else {
@@ -514,8 +493,8 @@ crb_reader_parse_request(crb_client_t *client)
 						}
     					trailing_ws++;
     					break;
-    				case 32: // SP
-    				case 9: // HT
+    				case ' ':
+    				case '\t':
     					if ( is_crlf ) {
     						// lws
     						is_crlf = 0;
@@ -528,31 +507,10 @@ crb_reader_parse_request(crb_client_t *client)
 							right = p-trailing_ws;
 							trailing_ws = 0;
 							
-						    header_value = calloc(1, right-left+1);
-						    if ( header_value != NULL && right-left > 0 ) {
-								memcpy(header_value, left, right-left);
-								printf("HEADER VALUE:\t\t{{%s}}\n", header_value);
-						    
-								crb_request_add_header(request, header_name, header_value);
-								
-								if ( header_name != NULL ) {
-									free(header_name);
-									header_name = NULL;
-								}
-								
-								free(header_value);
-								header_value = NULL;
+						    if ( right-left > 0 ) {
+						    	crb_request_add_header(request, header_name, header_name_length, left, right-left);
 						    } else {
-								printf("HEADER VALUE:\t\t{{}}\n");
-								
-								crb_request_add_header(request, header_name, "");
-								
-								if ( header_name != NULL ) {
-									free(header_name);
-									header_name = NULL;
-								}
-								
-								header_value = NULL;
+								crb_request_add_header(request, header_name, header_name_length, NULL, 0);
 						    }
 						    left = p;
 						    state = sw_header_name;
@@ -567,6 +525,46 @@ crb_reader_parse_request(crb_client_t *client)
     
     printf("Incomplete\n");
     return CRB_PARSE_HEADER_INCOMPLETE;
+}
+
+static int
+crb_reader_validate_request(crb_client_t *client)
+{
+	crb_request_t *request;
+	crb_header_t *header;
+	
+	request = client->request;
+	
+	// TODO: remove debug code
+	crb_hash_cursor_t *cursor = crb_hash_cursor_init(request->headers);
+
+	while ( (header = crb_hash_cursor_next(cursor)) != NULL ) {
+		printf("\t%s: %s\n", header->name, header->value);
+	}
+
+	crb_hash_cursor_free(cursor);
+	
+	header = crb_request_get_header(request, CRB_WS_KEY, -1);
+	if ( header == NULL || header->value == NULL ) {
+		printf("INVALID KEY HEADER\n");
+		return CRB_ERROR_INVALID_REQUEST;
+	}
+	
+	header = crb_request_get_header(request, CRB_WS_VERSION, -1);
+	if ( header == NULL || header->value == NULL || !(crb_strcmp2(header->value, '1', '3')) ) {
+		printf("INVALID VERSION HEADER\n");
+		return CRB_ERROR_INVALID_REQUEST;
+	}
+	
+	/*
+	header = crb_request_get_header(request, CRB_WS_PROTOCOL, -1);
+	if ( header == NULL || header->value == NULL || strstr(header->value, "caribou") == NULL ) {
+		printf("INVALID PROTOCOL HEADER\n");
+		return CRB_ERROR_INVALID_REQUEST;
+	}
+	*/
+	
+	return CRB_VALIDATE_DONE;
 }
 
 

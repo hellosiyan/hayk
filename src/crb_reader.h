@@ -9,6 +9,7 @@
 #define CRB_READER_CLIENTS_SCALE 4
 
 #define CRB_PARSE_HEADER_DONE			1
+#define CRB_VALIDATE_DONE				1
 #define CRB_PARSE_HEADER_INCOMPLETE		10
 #define CRB_ERROR_INVALID_METHOD		11
 #define CRB_ERROR_INVALID_REQUEST		12
@@ -22,7 +23,6 @@ struct crb_reader_s {
 	int epoll_fd;
 	unsigned running:1;
 };
-
 
 crb_reader_t *crb_reader_init();
 void crb_reader_free(crb_reader_t *reader);
