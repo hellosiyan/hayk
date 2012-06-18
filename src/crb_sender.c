@@ -93,7 +93,11 @@ crb_sender_loop(void *data)
 				case CRB_TASK_BROADCAST:
 					crb_sender_task_broadcast(task);
 					break;
+				case CRB_TASK_HANDSHAKE:
+					crb_task_free(task);
+					break;
 				default: 
+					crb_task_free(task);
 					break;
 			}
 		}

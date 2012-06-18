@@ -7,6 +7,7 @@
 typedef enum {
      CRB_TASK_NULL = 0,
      CRB_TASK_BROADCAST,
+     CRB_TASK_HANDSHAKE,
      CRB_TASK_SHUTDOWN
 } crb_task_type_e;
 

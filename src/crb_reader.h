@@ -8,6 +8,11 @@
 
 #define CRB_READER_CLIENTS_SCALE 4
 
+#define CRB_PARSE_HEADER_DONE			1
+#define CRB_PARSE_HEADER_INCOMPLETE		10
+#define CRB_ERROR_INVALID_METHOD		11
+#define CRB_ERROR_INVALID_REQUEST		12
+
 typedef struct crb_reader_s crb_reader_t;
 
 struct crb_reader_s {

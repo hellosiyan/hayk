@@ -21,6 +21,8 @@ crb_client_init()
     }
     
     client->state = CRB_STATE_CONNECTING;
+    client->data_state = CRB_STATE_CONNECTING;
+    client->request = NULL;
     client->buffer_in = crb_buffer_init(CRB_READER_BUFFER_SIZE);
     if ( client->buffer_in == NULL ) {
     	free(client);
@@ -32,6 +34,19 @@ crb_client_init()
     client->ref = 1;
 
     return client;
+}
+
+void 
+crb_client_set_request(crb_client_t *client, crb_request_t *request)
+{
+	if ( client->request != NULL ) {
+		crb_request_unref(client->request);
+	}
+	
+	if ( request != NULL ) {
+		crb_request_ref(request);
+	}
+	client->request = request;
 }
 
 void 
@@ -63,6 +78,12 @@ static void
 crb_client_free(crb_client_t *client)
 {
 	crb_client_close(client);
+	
 	crb_buffer_free(client->buffer_in);
+	
+	if ( client->request != NULL ) {		
+		crb_request_free(client->request);
+	}
+	
 	free(client);
 }

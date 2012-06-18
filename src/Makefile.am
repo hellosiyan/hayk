@@ -20,6 +20,8 @@ caribou_SOURCES =      \
     crb_hash.h         \
     crb_list.c         \
     crb_list.h         \
+    crb_request.c      \
+    crb_request.h      \
     crb_atomic.h        
 
 caribou_CFLAGS =       \

@@ -8,6 +8,7 @@ typedef struct crb_buffer_s crb_buffer_t;
 
 struct crb_buffer_s {
 	char *ptr;
+	char *rpos;
 	
 	size_t used;
 	size_t offset;
