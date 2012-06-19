@@ -18,6 +18,9 @@
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #undef HAVE_NETINET_IN_H
 
+/* Define to 1 if you have the <openssl/sha.h> header file. */
+#undef HAVE_OPENSSL_SHA_H
+
 /* Define to 1 if you have the `socket' function. */
 #undef HAVE_SOCKET
 

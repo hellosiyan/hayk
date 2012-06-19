@@ -28,3 +28,6 @@ caribou_CFLAGS =       \
     -DPACKAGE_DATA_DIR=\""$(datadir)"\" \
     -DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\"
 
+caribou_LDADD = \
+	-lssl \
+	-lcrypto

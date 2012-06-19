@@ -22,8 +22,6 @@ typedef struct crb_request_s crb_request_t;
 struct crb_request_s {
     char *uri;
     crb_hash_t *headers;
-    
-    
 	
 	int ref;
 };
@@ -35,6 +33,7 @@ crb_request_t *crb_request_init();
 void crb_request_set_uri(crb_request_t *request, char *uri, ssize_t length);
 void crb_request_add_header(crb_request_t *request, char *name, ssize_t name_length, char *value, ssize_t value_length);
 crb_header_t *crb_request_get_header(crb_request_t *request, char *name, ssize_t name_length);
+char *crb_request_get_headers_string(crb_request_t *request, int *size);
 void crb_request_ref(crb_request_t *request);
 void crb_request_unref(crb_request_t *request);
 

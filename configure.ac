@@ -16,7 +16,7 @@ AM_PROG_CC_C_O
 AC_CHECK_LIB(pthread, pthread_create)
 
 # Checks for header files.
-AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h])
+AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h openssl/sha.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 

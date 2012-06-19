@@ -5,12 +5,15 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <limits.h>
+#include <openssl/sha.h>
 
 #include "crb_sender.h"
 #include "crb_task.h"
 #include "crb_channel.h"
 
 static void crb_sender_task_broadcast(crb_task_t *task);
+static void crb_sender_task_handshake(crb_task_t *task);
+int crb_encode_base64(u_char *dst, u_char *src, int src_length);
 
 crb_sender_t *
 crb_sender_init()
@@ -94,7 +97,7 @@ crb_sender_loop(void *data)
 					crb_sender_task_broadcast(task);
 					break;
 				case CRB_TASK_HANDSHAKE:
-					crb_task_free(task);
+					crb_sender_task_handshake(task);
 					break;
 				default: 
 					crb_task_free(task);
@@ -169,3 +172,103 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_task_free(task);
 }
 
+static void 
+crb_sender_task_handshake(crb_task_t *task)
+{
+	crb_request_t *request;
+	crb_client_t *client;
+	int headers_length = 0;
+	char *headers;
+	
+	request = crb_request_init();
+	client = task->client;
+	
+	/* Construct request */
+	crb_request_add_header(request, "Upgrade", -1, "websocket", -1);
+	crb_request_add_header(request, "Connection", -1, "Upgrade", -1);
+	
+	/* Calculate Sec-WebSocket-Accept */
+	{
+		crb_header_t *key_header;
+		char ws_sha1[SHA_DIGEST_LENGTH];
+		char *ws_base64;
+		char *ws_string = NULL;
+		int ws_string_length = 0,
+			ws_base64_length = 0;
+		SHA_CTX sha1;
+		
+		// Compute SHA1
+		key_header = crb_request_get_header(task->client->request, CRB_WS_KEY, -1);
+		ws_string_length = asprintf(&ws_string, "%s%s", key_header->value, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+		
+		SHA1_Init(&sha1);
+		SHA1_Update(&sha1, ws_string, ws_string_length);
+		SHA1_Final(ws_sha1, &sha1);
+		
+		free(ws_string);
+		
+		// Compute Base64
+		ws_base64_length = (((SHA_DIGEST_LENGTH + 2) / 3) * 4);
+		ws_base64 = malloc(ws_base64_length+1);
+		ws_base64_length = crb_encode_base64(ws_base64, ws_sha1, SHA_DIGEST_LENGTH);
+		
+		crb_request_add_header(request, "Sec-WebSocket-Accept", -1, ws_base64, ws_base64_length);
+		free(ws_base64);
+	}
+	
+	/* Send request */
+	printf("Reply\n");
+	
+	write(client->sock_fd, "HTTP/1.1 101 Switching Protocols\r\n", 34);
+	
+	headers = crb_request_get_headers_string(request, &headers_length);
+	write(client->sock_fd, headers, headers_length);
+	write(client->sock_fd, "\r\n", 2);
+	
+	write(1, headers, headers_length);
+	
+	free(headers);
+	crb_request_unref(request);
+	
+	crb_task_free(task);
+}
+
+
+int
+crb_encode_base64(u_char *dst, u_char *src, int src_length)
+{
+    u_char *d, *s;
+    size_t len;
+    static u_char basis64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    len = src_length;
+    s = src;
+    d = dst;
+
+    while (len > 2) {
+        *d++ = basis64[(s[0] >> 2) & 0x3f];
+        *d++ = basis64[((s[0] & 3) << 4) | (s[1] >> 4)];
+        *d++ = basis64[((s[1] & 0x0f) << 2) | (s[2] >> 6)];
+        *d++ = basis64[s[2] & 0x3f];
+
+        s += 3;
+        len -= 3;
+    }
+
+    if (len) {
+        *d++ = basis64[(s[0] >> 2) & 0x3f];
+
+        if (len == 1) {
+            *d++ = basis64[(s[0] & 3) << 4];
+            *d++ = '=';
+
+        } else {
+            *d++ = basis64[((s[0] & 3) << 4) | (s[1] >> 4)];
+            *d++ = basis64[(s[1] & 0x0f) << 2];
+        }
+
+        *d++ = '=';
+    }
+
+    return d - dst;
+}

@@ -82,10 +82,16 @@ crb_request_add_header(crb_request_t *request, char *name, ssize_t name_length, 
 		return;
 	}
 	
+	if ( value_length == -1 ) {
+		value_length = strlen(value);
+	}
 	header->value = malloc(value_length+1);
 	header->value = memcpy(header->value, value, value_length);
 	header->value[value_length] = '\0';
 	
+	if ( name_length == -1 ) {
+		name_length = strlen(name);
+	}
 	header->name = malloc(name_length+1);
 	header->name = memcpy(header->name, name, name_length);
 	header->name[name_length] = '\0';
@@ -109,6 +115,42 @@ crb_request_get_header(crb_request_t *request, char *name, ssize_t name_length)
 	return header;
 }
 
+char *
+crb_request_get_headers_string(crb_request_t *request, int *size)
+{
+	crb_buffer_t *buffer;
+	crb_header_t *header;
+	char *string;
+	
+	buffer = crb_buffer_init(1024);
+	
+	// TODO: remove debug code
+	crb_hash_cursor_t *cursor = crb_hash_cursor_init(request->headers);
+
+	while ( (header = crb_hash_cursor_next(cursor)) != NULL ) {
+		crb_buffer_append_string(buffer, (const char*)header->name, -1);
+		crb_buffer_append_string(buffer, ": ", 2);
+		crb_buffer_append_string(buffer, (const char*)header->value, -1);
+		crb_buffer_append_string(buffer, "\r\n", 2);
+	}
+	crb_buffer_append_string(buffer, "\r\n", 2);
+
+	crb_hash_cursor_free(cursor);
+	
+	string = crb_buffer_copy_string(buffer);
+	if ( string == NULL ) {
+		return NULL;
+	}
+	
+	if ( size != NULL ) {
+		*size = buffer->used;
+	}
+	
+	crb_buffer_free(buffer);
+	
+	return string;
+}
+
 void 
 crb_request_ref(crb_request_t *request)
 {
@@ -121,7 +163,7 @@ crb_request_unref(crb_request_t *request)
 	int old_ref;
 	old_ref = __sync_sub_and_fetch( &(request->ref), 1 );
 	
-	if ( old_ref == 0 ) {
+	if ( old_ref <= 0 ) {
 		crb_request_free(request);
 	}
 }

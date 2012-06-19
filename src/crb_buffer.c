@@ -58,6 +58,22 @@ crb_buffer_copy(crb_buffer_t *orig)
 	return buffer;
 }
 
+char *
+crb_buffer_copy_string(crb_buffer_t *buffer)
+{
+	char *string;
+	
+	string = malloc(buffer->used+1);
+	if ( string == NULL ) {
+		return NULL;
+	}
+	
+	memcpy(string, buffer->ptr, buffer->used);
+	string[buffer->used - 1] = '\0';
+	
+	return string;
+}
+
 
 int 
 crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
@@ -67,6 +83,10 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 		return -1;
 	} else if ( str_len == 0 ) {
 		return 0;
+	}
+	
+	if ( str_len == -1 ) {
+		str_len = strlen(str);
 	}
 	
 	if ( buffer->used + str_len > buffer->size  ) {
