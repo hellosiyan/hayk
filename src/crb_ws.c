@@ -62,19 +62,10 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	}
 	
 	
-	raw = ntohs(* (uint16_t*) read_pos);
-	
-	// Mask
-	if ( raw & 128 == 0 ) {
-		frame->is_masked = 0; 
-	} else {
-		frame->is_masked = 1; 
-	}
-	
-	bitprint((uint8_t*)&raw, 2);
+	raw = * (uint16_t*) read_pos;
 	
 	// Opcode
-	switch( (raw >> 8) & 15 ) {
+	switch( raw & 15 ) {
 		case CRB_WS_CONT_FRAME: frame->opcode = CRB_WS_CONT_FRAME; break;
 		case CRB_WS_TEXT_FRAME: frame->opcode = CRB_WS_TEXT_FRAME; break;
 		case CRB_WS_BIN_FRAME: frame->opcode = CRB_WS_BIN_FRAME; break;
@@ -86,8 +77,17 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			return CRB_ERROR_INVALID_OPCODE;
 	}
 	
+	// Mask
+	if ( raw & 256 == 0 ) {
+		frame->is_masked = 0; 
+	} else {
+		frame->is_masked = 1; 
+	}
+	
+	bitprint((uint8_t*)&raw, 2);
+	
 	// Payload Length
-	frame->payload_len = raw&127;
+	frame->payload_len = (raw >> 8)&127;
 	printf("Payload: %i\n", frame->payload_len);
 	
 	if ( frame->payload_len == 126 ) {
@@ -98,7 +98,7 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
-		frame->payload_len = ntohs(* (uint16_t *) (read_pos + 2));
+		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
 		read_pos = read_pos + 4; 
 	} else if( frame->payload_len == 127 ) {
 		// 64bit length
@@ -129,7 +129,7 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	// Payload
 	if ( buffer->used < (read_pos + frame->payload_len) - buffer->ptr ) {
-		printf("Incomplete for Mask %i, required %i.\n", buffer->used, (read_pos + frame->payload_len) - buffer->ptr);
+		printf("Incomplete for Payload %i, required %i.\n", buffer->used, (read_pos + frame->payload_len) - buffer->ptr);
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
