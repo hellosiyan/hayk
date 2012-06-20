@@ -153,9 +153,17 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	ssize_t data_size = frame->data_length;
 	int bytes_written;
 	
+	uint8_t *header;
+	int header_length;
+	
+	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0);
+	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
+		data_offset = 0;
 		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
-			bytes_written = write(client->sock_fd, frame->data + data_offset, data_size);
+			bytes_written = write(client->sock_fd, (char*)header, header_length);
+			
+			bytes_written = write(client->sock_fd, frame->data, data_size);
 			
 			while (bytes_written > 0 && bytes_written < data_size) {
 				data_offset += bytes_written;
@@ -169,6 +177,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 		}
 	}
 	
+	free(header);
 	crb_hash_cursor_free(cursor);
 	free(frame->data);
 	crb_ws_frame_free(frame);
@@ -226,9 +235,6 @@ crb_sender_task_handshake(crb_task_t *task)
 	
 	headers = crb_request_get_headers_string(request, &headers_length);
 	write(client->sock_fd, headers, headers_length);
-	write(client->sock_fd, "\r\n", 2);
-	
-	write(1, headers, headers_length);
 	
 	free(headers);
 	crb_request_unref(request);

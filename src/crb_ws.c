@@ -45,6 +45,102 @@ crb_ws_frame_init()
 	return frame;
 }
 
+crb_ws_frame_t *
+crb_ws_frame_create_from_data(char *data, uint64_t data_length, int masked)
+{
+	crb_ws_frame_t *frame;
+	
+	if ( data == NULL || data_length <= 0 ) {
+		return NULL;
+	}
+	
+	frame = crb_ws_frame_init();
+	
+	frame->payload_len = data_length;
+	frame->opcode = CRB_WS_TEXT_FRAME;
+	
+	if ( masked ) {
+		frame->is_masked = 1;
+		frame->mask.raw = rand();
+	} else {
+		frame->is_masked = 0;
+	}
+	
+	frame->data = data;
+}
+
+uint8_t *
+crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked)
+{
+	uint8_t *pos;
+	
+	uint64_t payload_len;
+	uint8_t opcode;
+	union {
+		uint32_t raw;
+		uint8_t octets[4];
+	} mask;
+	int is_masked;
+	
+	// define frame properties 
+	payload_len = data_length;
+	opcode = CRB_WS_TEXT_FRAME;
+	
+	if ( masked ) {
+		is_masked = 1;
+		mask.raw = rand();
+	} else {
+		is_masked = 0;
+	}
+	
+	
+	// define data length
+	*length = 2;
+	
+	if ( payload_len < 126 ) {
+		// pass
+	} else if (payload_len <= 65536 ) {
+		*length += 2;
+	} else {
+		*length += 8;
+	}
+	
+	if ( is_masked ) {
+		 *length += 4;
+	}
+	
+	data = malloc(*length * sizeof(uint8_t));
+	pos = data;
+	
+	// Opcode, rsv, fin
+	*pos = (opcode&15) | 0b10000000;
+	pos += 1;
+	
+	// Payload length
+	if ( payload_len < 126 ) {
+		*pos = (payload_len&127) | (is_masked << 7);
+	} else if (payload_len <= 65536 ) {
+		*pos = 126 | (is_masked << 7);
+		pos += 1;
+		*(uint16_t*)pos = payload_len;
+		pos += 2;
+	} else {
+		*pos = 127 | (is_masked << 7);
+		pos += 1;
+		*((uint64_t*)pos) = (uint64_t)payload_len;
+		pos += 8;
+	}
+	
+	// Mask key
+	
+	if ( is_masked ) {
+		*((uint32_t*)pos) = mask.raw;
+		pos += 4;
+	}
+	
+	return data;
+}
+
 
 int
 crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)

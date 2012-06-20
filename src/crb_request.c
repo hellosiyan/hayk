@@ -143,7 +143,7 @@ crb_request_get_headers_string(crb_request_t *request, int *size)
 	}
 	
 	if ( size != NULL ) {
-		*size = buffer->used;
+		*size = buffer->used-1;
 	}
 	
 	crb_buffer_free(buffer);
