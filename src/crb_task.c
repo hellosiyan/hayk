@@ -16,6 +16,7 @@ crb_task_init()
     task->client = NULL;
     task->buffer = NULL;
     task->data = NULL;
+    task->data2 = NULL;
     task->prev = NULL;
     
     task->type = CRB_TASK_NULL;
@@ -60,6 +61,12 @@ void
 crb_task_set_data(crb_task_t *task, void *data)
 {
 	task->data = data;
+}
+
+void 
+crb_task_set_data2(crb_task_t *task, void *data)
+{
+	task->data2 = data;
 }
 
 void 

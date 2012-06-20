@@ -17,6 +17,7 @@
 #include "crb_task.h"
 #include "crb_channel.h"
 #include "crb_request.h"
+#include "crb_ws.h"
 
 
 #define crb_strcmp2(s, c0, c1) \
@@ -33,6 +34,22 @@
 static void crb_reader_on_data(crb_reader_t *reader, crb_client_t *client);
 static int crb_reader_parse_request(crb_client_t *client);
 static int crb_reader_validate_request(crb_client_t *client);
+
+static void
+bitprint(uint8_t *data, int len)
+{
+	uint8_t *start = data;
+	uint8_t x, y, i, z;
+	for (y = 0; y < len; y += 1) {
+		i = start[y];
+		printf("%i-", i);
+		for (x = 0; x < 8; x ++) {
+			z = 48 + ((i >> x)&1);
+			printf("%c", z);
+		}
+		printf("\n");
+	}
+}
 
 crb_reader_t *
 crb_reader_init()
@@ -192,10 +209,9 @@ static void
 crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 {
 	int result;
-	if ( client->data_state != CRB_DATA_STATE_HANDSHAKE ) {
-		printf("Wrong data status\n");
-		return;
-	}
+	crb_ws_frame_t *frame;
+	
+	frame = NULL;
 	
 	switch(client->data_state) {
 		case CRB_DATA_STATE_HANDSHAKE:
@@ -205,11 +221,11 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				// Close client
 				crb_reader_drop_client(reader, client);
 				crb_worker_on_client_disconnect(client);
-			} else if ( result == CRB_PARSE_HEADER_INCOMPLETE ) {
+			} else if ( result == CRB_PARSE_INCOMPLETE ) {
 				// Wait for more data, reset read position and free request
 				crb_client_set_request(client, NULL);
 				client->buffer_in->rpos = client->buffer_in->ptr;
-			} else if( result == CRB_PARSE_HEADER_DONE ) {
+			} else if( result == CRB_PARSE_DONE ) {
 				// Validate handshake
 				result = crb_reader_validate_request(client);
 				
@@ -223,12 +239,173 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				
 				client->state = CRB_STATE_OPEN;
 				client->data_state = CRB_DATA_STATE_FRAME_BEGIN;
+				crb_buffer_clear(client->buffer_in);
+			}
+			break;
+		case CRB_DATA_STATE_FRAME_BEGIN:
+			frame = NULL;
+			result = crb_reader_parse_frame(reader, client, &frame);
+			
+			if ( frame == NULL ) {
+				printf("NULL!\n");
+				break;
+			}
+			
+			if ( result == CRB_PARSE_INCOMPLETE ) {
+				// Wait for more data
+				if ( frame != NULL ) {
+					crb_ws_frame_free(frame);
+				}
+			} else if ( result == CRB_PARSE_DONE ) {
+				// TODO: Validate frame
+				if ( frame->opcode != CRB_WS_TEXT_FRAME ) {
+					printf("Opcode not text\n");
+					break;
+				} else if( frame->is_masked == 0 ) {
+					printf("Frame not masked\n");
+					break;
+				}
+				
+				crb_buffer_trim_left(client->buffer_in);
+				
+				// Broadcast
+				crb_task_t *task;
+				task = crb_task_init();
+				crb_task_set_client(task, client);
+				crb_task_set_type(task, CRB_TASK_BROADCAST);
+				crb_task_set_data(task, (void*)crb_worker_register_channel("test"));
+				crb_task_set_data2(task, frame);
+				
+				crb_worker_queue_task(task);
 			}
 			break;
 		default:
 			printf("Unknown data status\n");
 	}
 	
+}
+
+int
+crb_reader_parse_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t **frame_ptr)
+{
+	crb_buffer_t *buffer;
+	uint16_t raw;
+	char *read_pos;
+	crb_ws_frame_t *frame;
+	
+	buffer = client->buffer_in;
+	read_pos = buffer->rpos;
+	
+	if ( *frame_ptr == NULL ) {
+		frame = crb_ws_frame_init();
+		*frame_ptr = frame;
+	} else {
+		frame = *frame_ptr;
+	}
+	
+	printf("Reading frame...\n");
+	
+	if ( buffer->used < 2 ) {
+		printf("Incomplete %i.\n", buffer->used);
+		return CRB_PARSE_INCOMPLETE;
+	}
+	
+	
+	raw = ntohs(* (uint16_t*) read_pos);
+	
+	// Mask
+	if ( raw & 128 == 0 ) {
+		frame->is_masked = 0; 
+	} else {
+		frame->is_masked = 1; 
+	}
+	
+	bitprint((uint8_t*)&raw, 2);
+	
+	// Opcode
+	switch( (raw >> 8) & 15 ) {
+		case CRB_WS_CONT_FRAME: frame->opcode = CRB_WS_CONT_FRAME; break;
+		case CRB_WS_TEXT_FRAME: frame->opcode = CRB_WS_TEXT_FRAME; break;
+		case CRB_WS_BIN_FRAME: frame->opcode = CRB_WS_BIN_FRAME; break;
+		case CRB_WS_CLOSE_FRAME: frame->opcode = CRB_WS_CLOSE_FRAME; break;
+		case CRB_WS_PING_FRAME: frame->opcode = CRB_WS_PING_FRAME; break;
+		case CRB_WS_PONG_FRAME: frame->opcode = CRB_WS_PONG_FRAME; break;
+		default:
+			printf("Uknown opcode!\n");
+			return CRB_ERROR_INVALID_OPCODE;
+	}
+	
+	// Payload Length
+	frame->payload_len = raw&127;
+	printf("Payload: %i\n", frame->payload_len);
+	
+	if ( frame->payload_len == 126 ) {
+		// 16bit length
+		// require the next 2 bytes
+		if ( buffer->used < 4 ) {
+			printf("Incomplete %i.\n", buffer->used);
+			return CRB_PARSE_INCOMPLETE;
+		}
+		
+		frame->payload_len = ntohs(* (uint16_t *) (read_pos + 2));
+		read_pos = read_pos + 4; 
+	} else if( frame->payload_len == 127 ) {
+		// 64bit length
+		// require the next 8 bytes
+		if ( buffer->used < 10 ) {
+			printf("Incomplete %i.\n", buffer->used);
+			return CRB_PARSE_INCOMPLETE;
+		}
+		
+		frame->payload_len = ntohl(* (uint32_t *) (read_pos + 2));
+		frame->payload_len <<= 32;
+		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
+		read_pos = read_pos + 8; 
+	} else {
+		read_pos = read_pos + 2; 
+	}
+	
+	// Masking key
+	if ( frame->is_masked ) {
+		if ( buffer->used < (read_pos + 4) - buffer->ptr ) {
+			printf("Incomplete for Mask %i, required %i.\n", buffer->used, (read_pos + 4) - buffer->ptr);
+			return CRB_PARSE_INCOMPLETE;
+		}
+	
+		frame->mask.raw = * (uint32_t *) read_pos;
+		read_pos = read_pos + 4;
+	}
+	
+	// Payload
+	if ( buffer->used < (read_pos + frame->payload_len) - buffer->ptr ) {
+		printf("Incomplete for Mask %i, required %i.\n", buffer->used, (read_pos + frame->payload_len) - buffer->ptr);
+		return CRB_PARSE_INCOMPLETE;
+	}
+	
+	// Unmask
+	{
+		int i, j;
+		uint8_t ch;
+		
+		for (i = 0; i < frame->payload_len; i += 1) {
+			j = i%4;
+			ch = (*(u_char*)(read_pos+i))^frame->mask.octets[j];
+			*(read_pos+i) = ch;
+		}
+		
+		frame->data = malloc(frame->payload_len + 1);
+		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
+		frame->data_length = frame->payload_len;
+		frame->data[frame->data_length] = '\0';
+	}
+	
+	read_pos = read_pos + frame->payload_len;
+	buffer->rpos = read_pos;
+	
+	printf("DATA: %s\n", frame->data);
+	printf("Frame read.\n");
+	
+	return CRB_PARSE_DONE;
 }
 
 static int
@@ -269,7 +446,7 @@ crb_reader_parse_request(crb_client_t *client)
     
     if ( b->rpos >= last ) {
     	printf("nothing new\n");
-    	return CRB_PARSE_HEADER_INCOMPLETE;
+    	return CRB_PARSE_INCOMPLETE;
     }
     
     printf("begin parse\n");
@@ -487,7 +664,7 @@ crb_reader_parse_request(crb_client_t *client)
 						    crb_request_add_header(request, header_name, header_name_length, left, right-left);
 						    
 							printf("END OF TRANSMISSION\n");
-							return CRB_PARSE_HEADER_DONE;
+							return CRB_PARSE_DONE;
 						} else {
     						is_crlf = 1;
 						}
@@ -524,7 +701,7 @@ crb_reader_parse_request(crb_client_t *client)
     }
     
     printf("Incomplete\n");
-    return CRB_PARSE_HEADER_INCOMPLETE;
+    return CRB_PARSE_INCOMPLETE;
 }
 
 static int
@@ -566,6 +743,4 @@ crb_reader_validate_request(crb_client_t *client)
 	
 	return CRB_VALIDATE_DONE;
 }
-
-
 

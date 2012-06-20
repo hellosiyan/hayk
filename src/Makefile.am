@@ -24,6 +24,8 @@ caribou_SOURCES =      \
     crb_request.h      \
     crb_crypt.c	       \
     crb_crypt.h        \
+    crb_ws.c	       \
+    crb_ws.h       	   \
     crb_atomic.h        
 
 caribou_CFLAGS =       \

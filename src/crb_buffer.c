@@ -79,6 +79,7 @@ int
 crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 {
 	char *new_ptr;
+	int rpos_offset;
 	if ( !str ) {
 		return -1;
 	} else if ( str_len == 0 ) {
@@ -92,11 +93,16 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 	if ( buffer->used + str_len > buffer->size  ) {
 		buffer->size = buffer->used + str_len;
 		buffer->size += CRB_BUFFER_PIECE_SIZE - (buffer->size%CRB_BUFFER_PIECE_SIZE);
+		
+		rpos_offset = buffer->rpos - buffer->ptr;
+		
 		new_ptr = realloc(buffer->ptr, buffer->size);
 		if ( new_ptr == NULL ) {
+			printf("cannot alloc!\n");
 			return -1;
 		}
 		buffer->ptr = new_ptr;
+		buffer->rpos = buffer->ptr + rpos_offset;
 	}
 	
 	if (buffer->used == 0) {
@@ -112,9 +118,25 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 }
 
 void 
+crb_buffer_trim_left(crb_buffer_t *buffer)
+{
+	int size;
+	if ( buffer->ptr == buffer->rpos ) {
+		// Nothing to trim
+		return;
+	}
+	
+	size = buffer->used - (buffer->rpos - buffer->ptr);
+	buffer->ptr = memmove(buffer->ptr, buffer->rpos, size);
+	buffer->rpos = buffer->ptr;
+	buffer->used = size;
+}
+
+void 
 crb_buffer_clear(crb_buffer_t *buffer)
 {
 	buffer->used = 0;
+	buffer->rpos = buffer->ptr;
 }
 
 void 

@@ -20,6 +20,7 @@ struct crb_task_s {
 	crb_buffer_t *buffer;
 	
 	void *data;
+	void *data2;
 	
 	crb_task_t *prev; /* used in queues */
 };
@@ -37,6 +38,7 @@ void crb_task_free(crb_task_t *task);
 void crb_task_set_client(crb_task_t *task, crb_client_t *client);
 void crb_task_set_buffer(crb_task_t *task, crb_buffer_t *buffer);
 void crb_task_set_data(crb_task_t *task, void *data);
+void crb_task_set_data2(crb_task_t *task, void *data);
 void crb_task_set_type(crb_task_t *task, crb_task_type_e type);
 
 crb_task_queue_t *crb_task_queue_init();

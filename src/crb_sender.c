@@ -11,6 +11,7 @@
 #include "crb_task.h"
 #include "crb_channel.h"
 #include "crb_crypt.h"
+#include "crb_ws.h"
 
 static void crb_sender_task_broadcast(crb_task_t *task);
 static void crb_sender_task_handshake(crb_task_t *task);
@@ -147,28 +148,30 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_channel_t *channel = task->data;
 	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
 	crb_client_t *client;
-	crb_buffer_t *buffer = task->buffer;
-	ssize_t buffer_offset = 0;
-	ssize_t buffer_size = buffer->used-1;
+	crb_ws_frame_t *frame = task->data2;
+	ssize_t data_offset = 0;
+	ssize_t data_size = frame->data_length;
 	int bytes_written;
 	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
 		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
-			bytes_written = write(client->sock_fd, buffer->ptr + buffer_offset, buffer_size);
-			while (bytes_written > 0 && bytes_written < buffer_size) {
-				buffer_offset += bytes_written;
-				buffer_size -= bytes_written;
+			bytes_written = write(client->sock_fd, frame->data + data_offset, data_size);
+			
+			while (bytes_written > 0 && bytes_written < data_size) {
+				data_offset += bytes_written;
+				data_size -= bytes_written;
 				
 				do {
 					errno == 0;
-					bytes_written = write(client->sock_fd, buffer->ptr + buffer_offset, buffer_size);
+					bytes_written = write(client->sock_fd, frame->data + data_offset, data_size);
 				} while (bytes_written == -1 && errno == 11);
 			}
 		}
 	}
 	
 	crb_hash_cursor_free(cursor);
-	crb_buffer_free(task->buffer);
+	free(frame->data);
+	crb_ws_frame_free(frame);
 	crb_task_free(task);
 }
 
