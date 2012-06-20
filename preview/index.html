@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+	<title>Caribou Preview</title>
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script type="text/javascript" language="javascript" charset="utf-8">
+		jQuery(function($){
+			var ws;
+			var logs = $('.results ul');
+			
+			$('#form-connection').submit(function(){
+				var th = $(this);
+				ws = new WebSocket(th.find('input[name=url]').val());
+				init_ws(ws);
+				return false;
+			});
+			
+			$('#form-message').submit(function(){
+				var th = $(this);
+				ws.send(th.find('input[name=msg]').val());
+				return false;
+			});
+			
+			function init_ws(ws) {
+				ws.onopen = function(e){
+					console.log('onopen', e);
+					ws_log('** Connected to ' + e.target.url);
+				}
+			
+				ws.onerror = function(a, b){
+					console.log('onerror', a, b);
+					ws_log('** Error: ');
+				}
+			
+				ws.onmessage = function(e){
+					ws_log(e.data);
+					console.log('onmessage', e);
+				}
+			
+				ws.onclose = function(e){
+					ws_log('** Closed');
+				}
+			}
+			
+			function ws_log(string) {
+				var date = new Date();
+				logs.prepend($('<li><em>' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds() + '</em> ' + string + '</li>'));
+			}
+		});
+	</script>
+</head>
+<body>
+	<form id="form-connection" action="" method="get">
+		<input type="text" name="url" value="ws://localhost:8080/test" />
+		<input type="submit" value="Init connection" />
+	</form>
+	<form id="form-message" action="" method="get">
+		<input type="text" name="msg" value="Hello!" />
+	
+		<p><input type="submit" value="Send" /></p>
+	</form>
+	<div class="results">
+		<ul>
+			
+		</ul>
+	</div>
+</body>
+</html>
