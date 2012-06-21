@@ -49,13 +49,13 @@ crb_client_set_request(crb_client_t *client, crb_request_t *request)
 	client->request = request;
 }
 
-void 
+inline void 
 crb_client_ref(crb_client_t *client)
 {
 	crb_atomic_fetch_add( &(client->ref), 1 );
 }
 
-void 
+inline void 
 crb_client_unref(crb_client_t *client)
 {
 	int old_ref;

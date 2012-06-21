@@ -84,10 +84,9 @@ crb_reader_loop(void *data)
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
-				printf("Drop client\n");
+				write(1, "Drop client\n", 12);
 				client = (crb_client_t *) events[i].data.ptr;
 				crb_reader_drop_client(reader, client);
-				crb_worker_on_client_disconnect(client);
 				continue;
 			} else if (events[i].events & EPOLLIN) {
 				client = (crb_client_t *) events[i].data.ptr;
@@ -165,10 +164,12 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 void 
 crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 {
-	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
-	crb_client_unref(client);
+	crb_worker_on_client_disconnect(client);
 	
+	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
+	
+	crb_client_unref(client);
 }
 
 void 
@@ -203,7 +204,6 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			if ( result == CRB_ERROR_INVALID_METHOD || result == CRB_ERROR_INVALID_REQUEST ) {
 				// Close client
 				crb_reader_drop_client(reader, client);
-				crb_worker_on_client_disconnect(client);
 			} else if ( result == CRB_PARSE_INCOMPLETE ) {
 				// Wait for more data, reset read position and free request
 				crb_client_set_request(client, NULL);
@@ -214,7 +214,6 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				if ( result != CRB_VALIDATE_DONE ) {
 					// Invalid WebSocket request
 					crb_reader_drop_client(reader, client);
-					crb_worker_on_client_disconnect(client);
 					break;
 				}
 				
@@ -310,11 +309,8 @@ crb_reader_parse_request(crb_client_t *client)
     last = b->ptr + b->used;
     
     if ( b->rpos >= last ) {
-    	printf("nothing new\n");
     	return CRB_PARSE_INCOMPLETE;
     }
-    
-    printf("begin parse\n");
     
     for (; b->rpos < last; b->rpos++) {
     	p = b->rpos;
@@ -444,7 +440,7 @@ crb_reader_parse_request(crb_client_t *client)
     				case '\n':
     					if ( is_crlf ) {
 							printf("END OF TRANSMISSION\n");
-							return;
+							return CRB_PARSE_DONE;
     					} else {				
 							is_crlf = 1;
     					}
@@ -565,7 +561,6 @@ crb_reader_parse_request(crb_client_t *client)
     	}
     }
     
-    printf("Incomplete\n");
     return CRB_PARSE_INCOMPLETE;
 }
 
@@ -576,15 +571,6 @@ crb_reader_validate_request(crb_client_t *client)
 	crb_header_t *header;
 	
 	request = client->request;
-	
-	// TODO: remove debug code
-	crb_hash_cursor_t *cursor = crb_hash_cursor_init(request->headers);
-
-	while ( (header = crb_hash_cursor_next(cursor)) != NULL ) {
-		printf("\t%s: %s\n", header->name, header->value);
-	}
-
-	crb_hash_cursor_free(cursor);
 	
 	header = crb_request_get_header(request, CRB_WS_KEY, -1);
 	if ( header == NULL || header->value == NULL ) {

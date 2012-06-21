@@ -48,6 +48,9 @@ crb_hash_init(ssize_t scale)
     	free(hash);
     	return NULL;
     }
+    
+	hash->item_add = NULL;
+	hash->item_remove = crb_hash_item_unref;
 
     return hash;
 }
@@ -85,13 +88,14 @@ crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len)
 	hash_key = crb_murmurhash3(key, key_len);
 	col = hash_key%hash->scale;
 	
+	new_item = crb_hash_item_init();
+	new_item->key = hash_key;
+	new_item->data = data;
+	
 begin_insert:
 	tmp_item = hash->items[col];
 	if ( tmp_item == NULL ) {
 		// first item is free
-		new_item = crb_hash_item_init();
-		new_item->key = hash_key;
-		new_item->data = data;
 		new_item->next = NULL;
 		
 		if ( !crb_atomic_cmp_set(&(hash->items[col]), NULL, new_item) ) {
@@ -99,19 +103,12 @@ begin_insert:
 		}
 	} else if( tmp_item->key > hash_key ) {
 		// insert before first item
-		new_item = crb_hash_item_init();
-		new_item->key = hash_key;
-		new_item->data = data;
 		new_item->next = tmp_item;
 		
 		if ( !crb_atomic_cmp_set(&(hash->items[col]), tmp_item, new_item) ) {
 			goto begin_insert;
 		}
 	} else {
-		new_item = crb_hash_item_init();
-		new_item->key = hash_key;
-		new_item->data = data;
-		
 		do {
 			tmp_item = hash->items[col];
 			do {
@@ -127,6 +124,10 @@ begin_insert:
 	
 			new_item->next = tmp_item->next;
 		} while( !crb_atomic_cmp_set(&(tmp_item->next), new_item->next, new_item) );
+	}
+	
+	if ( hash->item_add != NULL ) {
+		hash->item_add(new_item);
 	}
 	
 	return data;
@@ -149,17 +150,26 @@ crb_hash_remove(crb_hash_t *hash, void *key, int key_len)
 		hash->items[hash_key%hash->scale] = tmp_item->next;
 		
 		data = tmp_item->data;
-		crb_hash_item_unref(tmp_item);
+		
+		if ( hash->item_remove != NULL ) {
+			hash->item_remove(tmp_item);
+		} else {
+			crb_hash_item_unref(tmp_item);
+		}
 	} else {
 		while ( tmp_item != NULL ) {
 			if ( tmp_item->next != NULL && tmp_item->next->key == hash_key ) {
 				// found
 				found_item = tmp_item->next;
-				tmp_item->next = tmp_item->next->next;
+				crb_atomic_cmp_set(&(tmp_item->next), found_item, found_item->next);
 				data = found_item->data;
-				crb_hash_item_unref(found_item);
+				if ( hash->item_remove != NULL ) {
+					hash->item_remove(found_item);
+				} else {
+					crb_hash_item_unref(found_item);
+				}
 				break;
-			} else if( tmp_item->next != NULL && tmp_item->next->key > hash_key ) {
+			} else if( tmp_item->next != NULL && tmp_item->next->key < hash_key ) {
 				tmp_item = tmp_item->next;
 			} else {
 				// not found
@@ -209,6 +219,10 @@ crb_hash_cursor_init(crb_hash_t *hash)
 	
 	cursor->hash = hash;
 	cursor->col = 0;
+	
+	cursor->item_add = hash->item_add;
+	cursor->item_remove = hash->item_remove;
+	
 	cursor->row = hash->items[0];
 	if ( cursor->row != NULL ) {
 		crb_hash_item_ref(cursor->row);

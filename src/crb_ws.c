@@ -150,10 +150,7 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	read_pos = buffer->rpos;
 	
-	printf("Reading frame...\n");
-	
 	if ( buffer->used < 2 ) {
-		printf("Incomplete %i.\n", buffer->used);
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
@@ -169,7 +166,6 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		case CRB_WS_PING_FRAME: frame->opcode = CRB_WS_PING_FRAME; break;
 		case CRB_WS_PONG_FRAME: frame->opcode = CRB_WS_PONG_FRAME; break;
 		default:
-			printf("Uknown opcode!\n");
 			return CRB_ERROR_INVALID_OPCODE;
 	}
 	
@@ -180,17 +176,13 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		frame->is_masked = 1; 
 	}
 	
-	bitprint((uint8_t*)&raw, 2);
-	
 	// Payload Length
 	frame->payload_len = (raw >> 8)&127;
-	printf("Payload: %i\n", frame->payload_len);
 	
 	if ( frame->payload_len == 126 ) {
 		// 16bit length
 		// require the next 2 bytes
 		if ( buffer->used < 4 ) {
-			printf("Incomplete %i.\n", buffer->used);
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -200,7 +192,6 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		// 64bit length
 		// require the next 8 bytes
 		if ( buffer->used < 10 ) {
-			printf("Incomplete %i.\n", buffer->used);
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -248,9 +239,6 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	read_pos = read_pos + frame->payload_len;
 	buffer->rpos = read_pos;
-	
-	printf("DATA: %s\n", frame->data);
-	printf("Frame read.\n");
 	
 	return CRB_PARSE_DONE;
 }

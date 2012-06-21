@@ -17,11 +17,17 @@ typedef struct crb_hash_s crb_hash_t;
 struct crb_hash_s {
 	crb_hash_item_t **items;
 	ssize_t scale;
+	
+	void (*item_add)(crb_hash_item_t *item);
+	void (*item_remove)(crb_hash_item_t *item);
 };
 
 typedef struct crb_hash_cursor_s crb_hash_cursor_t;
 struct crb_hash_cursor_s {
 	crb_hash_t *hash;
+	
+	void (*item_add)(crb_hash_item_t *item);
+	void (*item_remove)(crb_hash_item_t *item);
 	
 	int col;
 	crb_hash_item_t *row;

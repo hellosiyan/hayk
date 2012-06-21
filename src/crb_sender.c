@@ -160,6 +160,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
 		data_offset = 0;
+		
 		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
 			bytes_written = write(client->sock_fd, (char*)header, header_length);
 			
@@ -229,7 +230,6 @@ crb_sender_task_handshake(crb_task_t *task)
 	}
 	
 	/* Send request */
-	printf("Reply\n");
 	
 	write(client->sock_fd, "HTTP/1.1 101 Switching Protocols\r\n", 34);
 	

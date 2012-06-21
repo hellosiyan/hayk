@@ -2,8 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "crb_atomic.h"
 #include "crb_channel.h"
 #include "crb_hash.h"
+
+static void crb_hash_item_add_client(crb_hash_item_t *item);
+static void crb_hash_item_remove_client(crb_hash_item_t *item);
 
 crb_channel_t *
 crb_channel_init()
@@ -18,7 +22,9 @@ crb_channel_init()
     channel->name = NULL;
     channel->client_count = 0;
     
-	channel->clients = crb_hash_init(1);
+	channel->clients = crb_hash_init(4);
+	channel->clients->item_add = crb_hash_item_add_client;
+	channel->clients->item_remove = crb_hash_item_remove_client;
 
     return channel;
 }
@@ -54,16 +60,33 @@ crb_channel_set_name(crb_channel_t *channel, char *name)
 void 
 crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client)
 {
-	crb_hash_insert(channel->clients, client, &(client->sock_fd), sizeof(int));
+	crb_hash_insert(channel->clients, client, &(client->id), sizeof(int));
 	crb_client_ref(client);
-	channel->client_count++;
+	crb_atomic_fetch_add( &(channel->client_count), 1 );
 }
 
 void 
 crb_channel_unsubscribe(crb_channel_t *channel, crb_client_t *client)
 {
-	crb_hash_remove(channel->clients, &(client->sock_fd), sizeof(int));
+	crb_hash_remove(channel->clients, &(client->id), sizeof(int));
+	
 	crb_client_unref(client);
 	channel->client_count--;
 }
+
+static void
+crb_hash_item_add_client(crb_hash_item_t *item)
+{
+	crb_client_ref((crb_client_t*) item->data);
+}
+
+
+static void
+crb_hash_item_remove_client(crb_hash_item_t *item)
+{
+	crb_client_unref((crb_client_t*) item->data);
+	crb_hash_item_unref(item);
+}
+
+
 

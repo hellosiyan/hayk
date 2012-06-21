@@ -59,6 +59,7 @@ crb_worker_create()
 	
 	worker->active_reader = NULL;
 	
+	crb_worker_signals_init();
 	crb_worker_reader_pool_init();
 	crb_worker_sender_pool_init();
 }
@@ -279,6 +280,7 @@ crb_worker_signals_init()
     for (sig = signals; sig->signo != 0; sig++) {
         memset(&sa, 0, sizeof(struct sigaction));
         sa.sa_handler = sig->handler;
+        sa.sa_flags = 0;
         sigemptyset(&sa.sa_mask);
         if (sigaction(sig->signo, &sa, NULL) == -1) {
             break;
