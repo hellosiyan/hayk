@@ -180,8 +180,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	
 	free(header);
 	crb_hash_cursor_free(cursor);
-	free(frame->data);
-	crb_ws_frame_free(frame);
+	crb_ws_frame_free_with_data(frame);
 	crb_task_free(task);
 }
 

@@ -17,6 +17,8 @@ struct crb_list_s {
 };
 
 crb_list_t *crb_list_init();
+void crb_list_free(crb_list_t *list);
+
 void crb_list_push(crb_list_t *list, void *data);
 void crb_list_unshift(crb_list_t *list, void *data);
 void *crb_list_pop(crb_list_t *list);

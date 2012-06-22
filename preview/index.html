@@ -19,7 +19,19 @@
 			
 			$('#form-message').submit(function(){
 				var th = $(this);
-				ws.send(th.find('input[name=msg]').val());
+				ws_send(th.find('input[name=msg]').val());
+				return false;
+			});
+			
+			$('#form-channel-sub').submit(function(){
+				var th = $(this);
+				ws_subscribe(th.find('input[name=channel]').val());
+				return false;
+			});
+			
+			$('#form-channel-unsub').submit(function(){
+				var th = $(this);
+				ws_unsubscribe(th.find('input[name=channel]').val());
 				return false;
 			});
 			
@@ -39,14 +51,26 @@
 				}
 			
 				ws.onmessage = function(e){
-					ws_log(e.data);
 					console.log('onmessage', e);
+					ws_log(e.data);
 				}
 			
 				ws.onclose = function(e){
 					console.log( e );
 					ws_log('** Closed');
 				}
+			}
+			
+			function  ws_send(string) {
+				ws.send('DAT\ntest\n' + string);
+			}
+			
+			function  ws_subscribe(channel) {
+				ws.send('CTL\nSubscribe: ' + channel + '\n');
+			}
+			
+			function  ws_unsubscribe(channel) {
+				ws.send('CTL\nUnsubscribe: ' + channel + '\n');
 			}
 			
 			function ws_log(string) {
@@ -61,6 +85,14 @@
 		<input type="text" name="url" value="ws://localhost:8080/test" />
 		<input type="submit" value="Init connection" />
 		<a href="#" class="close">Close</a>
+	</form>
+	<form id="form-channel-sub" action="" method="get">
+		<input type="text" name="channel" value="test" />
+		<input type="submit" value="subscribe" />
+	</form>
+	<form id="form-channel-unsub" action="" method="get">
+		<input type="text" name="channel" value="test" />
+		<input type="submit" value="unsubscribe" />
 	</form>
 	<form id="form-message" action="" method="get">
 		<input type="text" name="msg" value="Hello!" />

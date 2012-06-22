@@ -20,6 +20,15 @@ crb_list_init()
     return list;
 }
 
+void
+crb_list_free(crb_list_t *list)
+{
+    while ( crb_list_pop(list) ) {
+    	// pass
+    }
+    
+    free(list);
+}
 
 void 
 crb_list_push(crb_list_t *list, void *data)

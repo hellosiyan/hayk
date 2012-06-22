@@ -76,7 +76,7 @@ crb_channel_set_name(crb_channel_t *channel, char *name)
 void 
 crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client)
 {
-	if ( channel == NULL || client == NULL ) {
+	if ( channel == NULL || client == NULL || crb_channel_client_is_subscribed(channel, client) ) {
 		return;
 	}
 	
@@ -88,7 +88,7 @@ crb_channel_subscribe(crb_channel_t *channel, crb_client_t *client)
 void 
 crb_channel_unsubscribe(crb_channel_t *channel, crb_client_t *client)
 {
-	if ( channel == NULL || client == NULL ) {
+	if ( channel == NULL || client == NULL || !crb_channel_client_is_subscribed(channel, client) ) {
 		return;
 	}
 	
@@ -96,6 +96,12 @@ crb_channel_unsubscribe(crb_channel_t *channel, crb_client_t *client)
 	
 	crb_client_unref(client);
 	crb_atomic_fetch_sub(&(channel->client_count), 1);
+}
+
+crb_client_t *
+crb_channel_client_is_subscribed(crb_channel_t *channel, crb_client_t *client)
+{
+	return (crb_client_t *) crb_hash_exists_key(channel->clients, &(client->id), sizeof(int));
 }
 
 static void

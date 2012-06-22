@@ -34,6 +34,7 @@ int crb_worker_run();
 int crb_worker_stop();
 void crb_worker_queue_task();
 crb_channel_t *crb_worker_register_channel(char *name);
+crb_channel_t *crb_worker_get_channel(char *name, int name_length);
 crb_worker_t *crb_worker_get();
 
 void crb_worker_on_client_connect(crb_client_t *client);

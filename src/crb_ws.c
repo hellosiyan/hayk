@@ -6,6 +6,16 @@
 #include "crb_ws.h"
 #include "crb_buffer.h"
 
+#define crb_strcmp2(s, c0, c1) \
+    s[0] == c0 && s[1] == c1
+    
+#define crb_strcmp3(s, c0, c1, c2) \
+    s[0] == c0 && s[1] == c1 && s[2] == c2
+
+#define crb_strcmp8(s, c0, c1, c2, c3, c4, c5, c6, c7) \
+    s[0] == c0 && s[1] == c1 && s[2] == c2 && s[3] == c3 \
+        && s[4] == c4 && s[5] == c5 && s[6] == c6 && s[7] == c7
+
 
 static void
 bitprint(uint8_t *data, int len)
@@ -35,6 +45,7 @@ crb_ws_frame_init()
 	
 	frame->payload_len = 0;
 	frame->opcode = 0;
+	frame->crb_type = 0;
 	frame->mask.raw = 0;
 	
 	frame->is_masked = 0;
@@ -58,6 +69,7 @@ crb_ws_frame_create_from_data(char *data, uint64_t data_length, int masked)
 	
 	frame->payload_len = data_length;
 	frame->opcode = CRB_WS_TEXT_FRAME;
+	frame->crb_type = CRB_WS_TYPE_DATA;
 	
 	if ( masked ) {
 		frame->is_masked = 1;
@@ -191,8 +203,8 @@ crb_ws_frame_close(int *length, int masked)
 }
 
 
-int
-crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
+int 
+crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 {
 	uint16_t raw;
 	char *read_pos;
@@ -236,6 +248,11 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		}
 		
 		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
+		
+		if ( frame->payload_len < 4 ) {
+			return CRB_PARSE_INCOMPLETE;
+		}
+		
 		read_pos = read_pos + 4; 
 	} else if( frame->payload_len == 127 ) {
 		// 64bit length
@@ -247,8 +264,16 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		frame->payload_len = ntohl(* (uint32_t *) (read_pos + 2));
 		frame->payload_len <<= 32;
 		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
+		
+		if ( frame->payload_len < 4 ) {
+			return CRB_PARSE_INCOMPLETE;
+		}
+		
 		read_pos = read_pos + 8; 
 	} else {
+		if ( frame->payload_len < 4 ) {
+			return CRB_PARSE_INCOMPLETE;
+		}
 		read_pos = read_pos + 2; 
 	}
 	
@@ -269,7 +294,7 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
-	// Unmask
+	// Payload / Unmask 
 	{
 		int i, j;
 		uint8_t ch;
@@ -278,6 +303,21 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			j = i%4;
 			ch = (*(u_char*)(read_pos+i))^frame->mask.octets[j];
 			*(read_pos+i) = ch;
+		}
+		
+		// detect message type (data or control)
+		// remove the first 4 characters for the type id from the plain message
+		if ( crb_strcmp3(read_pos, 'D', 'A', 'T') ) {
+			frame->crb_type = CRB_WS_TYPE_DATA;
+			read_pos += 4;
+			frame->payload_len -= 4;
+		} else if ( crb_strcmp3(read_pos, 'C', 'T', 'L') ) {
+			frame->crb_type = CRB_WS_TYPE_CONTROL;
+			read_pos += 4;
+			frame->payload_len -= 4;
+		} else {
+			printf("Unrecognised frame type (dat/ctl).\n");
+			return CRB_PARSE_INCOMPLETE;
 		}
 		
 		frame->data = malloc(frame->payload_len + 1);
@@ -295,5 +335,26 @@ crb_reader_parse_frame(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 void 
 crb_ws_frame_free(crb_ws_frame_t *frame)
 {
+	if ( frame == NULL ) {
+		return;
+	}
+	
 	free(frame);
 }
+
+void
+crb_ws_frame_free_with_data(crb_ws_frame_t *frame)
+{
+	if ( frame == NULL ) {
+		return;
+	}
+	
+	if ( frame->data != NULL ) {
+		free(frame->data);
+		frame->data = NULL;
+	}
+	
+	free(frame);
+}
+
+

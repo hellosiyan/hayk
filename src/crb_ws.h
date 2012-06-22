@@ -17,10 +17,14 @@
 #define CRB_WS_PING_FRAME	9
 #define CRB_WS_PONG_FRAME	10
 
+#define CRB_WS_TYPE_DATA	0
+#define CRB_WS_TYPE_CONTROL	1
+
 typedef struct crb_ws_frame_s crb_ws_frame_t;
 struct crb_ws_frame_s {
 	uint64_t payload_len;
 	uint8_t opcode;
+	uint8_t crb_type;
 	union {
 		uint32_t raw;
 		uint8_t octets[4];
@@ -37,6 +41,7 @@ crb_ws_frame_t *crb_ws_frame_create_from_data(char *data, uint64_t data_length, 
 uint8_t *crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked);
 uint8_t *crb_ws_frame_close(int *length, int masked);
 void crb_ws_frame_free(crb_ws_frame_t *frame);
+void crb_ws_frame_free_with_data(crb_ws_frame_t *frame);
 
 
 #endif /* __CRB_WS_H__ */

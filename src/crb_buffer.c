@@ -121,12 +121,16 @@ void
 crb_buffer_trim_left(crb_buffer_t *buffer)
 {
 	int size;
-	if ( buffer->ptr == buffer->rpos ) {
+	if ( buffer->ptr >= buffer->rpos ) {
 		// Nothing to trim
 		return;
 	}
 	
 	size = buffer->used - (buffer->rpos - buffer->ptr);
+	if ( size <= 0 ) {
+		return;
+	}
+	
 	buffer->ptr = memmove(buffer->ptr, buffer->rpos, size);
 	buffer->rpos = buffer->ptr;
 	buffer->used = size;

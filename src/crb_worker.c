@@ -242,13 +242,25 @@ crb_worker_register_channel(char *name)
 	channel = crb_hash_exists_key(worker->channels, name, strlen(name));
 	
 	if ( channel == NULL ) {
+		printf("CREATE \"%s\"\n", name);
 		channel = crb_channel_init();
 		crb_channel_set_name(channel, name);
 		channel = crb_hash_insert(worker->channels, channel, name, strlen(name));
 	}
 	
-	
 	return channel;
+}
+
+crb_channel_t *
+crb_worker_get_channel(char *name, int name_length)
+{
+	crb_worker_t *worker = crb_worker_get();
+	
+	if ( name_length == -1 ) {
+		name_length = strlen(name);
+	}
+	
+	return crb_hash_exists_key(worker->channels, name, name_length);
 }
 
 void
@@ -256,18 +268,26 @@ crb_worker_on_client_connect(crb_client_t *client)
 {
 	client->state = CRB_STATE_CONNECTING;
 	crb_reader_add_client(worker->active_reader, client);
-	
-	/* TODO: remove; begin test code */
-	crb_channel_subscribe(crb_worker_register_channel("test"), client);
-	/* end test code */
 }
 
 void
 crb_worker_on_client_disconnect(crb_client_t *client)
 {
-	/* TODO: remove; begin test code */
-	crb_channel_unsubscribe(crb_worker_register_channel("test"), client);
-	/* end test code */
+	crb_channel_t *channel;
+	crb_hash_cursor_t *cursor;
+	
+	if ( client == NULL ) {
+		return;
+	}
+	
+	/* Unsubscribe client from all channels */
+	cursor = crb_hash_cursor_init(worker->channels);
+
+	while ( (channel = crb_hash_cursor_next(cursor)) != NULL ) {
+		crb_channel_unsubscribe(channel, client);
+	}
+
+	crb_hash_cursor_free(cursor);
 }
 
 
