@@ -169,6 +169,16 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
 	
+	if ( client->state == CRB_STATE_OPEN ) {
+		uint8_t *close_frame;
+		int close_frame_length;
+	
+		close_frame = crb_ws_frame_close(&close_frame_length, 0);
+		
+		write(client->sock_fd, (char*)close_frame, close_frame_length);
+		free(close_frame);
+	}
+	
 	crb_client_unref(client);
 }
 
@@ -242,28 +252,36 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				// TODO: skip frame
 				crb_ws_frame_free(frame);
 			} else if ( result == CRB_PARSE_DONE ) {
-				// TODO: Validate frame
-				if ( frame->opcode != CRB_WS_TEXT_FRAME ) {
-					printf("Opcode not text\n");
-					crb_ws_frame_free(frame);
-					break;
-				} else if( frame->is_masked == 0 ) {
+				// Valid frame
+				if( frame->is_masked == 0 ) {
 					printf("Frame not masked\n");
+					free(frame->data);
 					crb_ws_frame_free(frame);
 					break;
 				}
 				
 				crb_buffer_trim_left(client->buffer_in);
 				
-				// Broadcast
-				crb_task_t *task;
-				task = crb_task_init();
-				crb_task_set_client(task, client);
-				crb_task_set_type(task, CRB_TASK_BROADCAST);
-				crb_task_set_data(task, (void*)crb_worker_register_channel("test"));
-				crb_task_set_data2(task, frame);
-				
-				crb_worker_queue_task(task);
+				// take action based on frame type
+				if ( frame->opcode == CRB_WS_TEXT_FRAME ) {
+					crb_task_t *task;
+					task = crb_task_init();
+					crb_task_set_client(task, client);
+					crb_task_set_type(task, CRB_TASK_BROADCAST);
+					crb_task_set_data(task, (void*)crb_worker_register_channel("test"));
+					crb_task_set_data2(task, frame);
+			
+					crb_worker_queue_task(task);
+				} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
+					printf("close frame\n");
+					free(frame->data);
+					crb_ws_frame_free(frame);
+					crb_reader_drop_client(reader, client);
+				} else {
+					printf("unknown frame\n");
+					free(frame->data);
+					crb_ws_frame_free(frame);
+				}
 			}
 			break;
 		default:

@@ -72,7 +72,7 @@ crb_ws_frame_create_from_data(char *data, uint64_t data_length, int masked)
 uint8_t *
 crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked)
 {
-	uint8_t *pos;
+	uint8_t *pos, *frame_data;
 	
 	uint64_t payload_len;
 	uint8_t opcode;
@@ -109,8 +109,8 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 		 *length += 4;
 	}
 	
-	data = malloc(*length * sizeof(uint8_t));
-	pos = data;
+	frame_data = malloc(*length * sizeof(uint8_t));
+	pos = frame_data;
 	
 	// Opcode, rsv, fin
 	*pos = (opcode&15) | 0b10000000;
@@ -133,6 +133,55 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	
 	// Mask key
 	
+	if ( is_masked ) {
+		*((uint32_t*)pos) = mask.raw;
+		pos += 4;
+	}
+	
+	return frame_data;
+}
+
+uint8_t *
+crb_ws_frame_close(int *length, int masked)
+{
+	uint8_t *pos, *data;
+	
+	uint64_t payload_len;
+	uint8_t opcode;
+	union {
+		uint32_t raw;
+		uint8_t octets[4];
+	} mask;
+	int is_masked;
+	
+	// define frame properties 
+	opcode = CRB_WS_CLOSE_FRAME;
+	
+	if ( masked ) {
+		is_masked = 1;
+		mask.raw = rand();
+	} else {
+		is_masked = 0;
+	}
+	
+	// define data length
+	*length = 2;
+	
+	if ( is_masked ) {
+		 *length += 4;
+	}
+	
+	data = malloc(*length * sizeof(uint8_t));
+	pos = data;
+	
+	// Opcode, rsv, fin
+	*pos = (opcode&15) | 0b10000000;
+	pos += 1;
+	
+	// Payload length
+	*pos = 0 | (is_masked << 7);
+	
+	// Mask key
 	if ( is_masked ) {
 		*((uint32_t*)pos) = mask.raw;
 		pos += 4;

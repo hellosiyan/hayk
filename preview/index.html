@@ -23,6 +23,10 @@
 				return false;
 			});
 			
+			$('a.close').click(function(){
+				ws.close();
+			});
+			
 			function init_ws(ws) {
 				ws.onopen = function(e){
 					console.log('onopen', e);
@@ -40,6 +44,7 @@
 				}
 			
 				ws.onclose = function(e){
+					console.log( e );
 					ws_log('** Closed');
 				}
 			}
@@ -55,6 +60,7 @@
 	<form id="form-connection" action="" method="get">
 		<input type="text" name="url" value="ws://localhost:8080/test" />
 		<input type="submit" value="Init connection" />
+		<a href="#" class="close">Close</a>
 	</form>
 	<form id="form-message" action="" method="get">
 		<input type="text" name="msg" value="Hello!" />
