@@ -26,7 +26,14 @@
 #define SERVER_PORT 8080
 #define CRB_WORKER_CHANNELS_SCALE 4
 
+
 static crb_worker_t *worker;
+
+static void crb_worker_signals_init();
+static void crb_worker_reader_pool_init();
+static void crb_worker_sender_pool_init();
+static void _crb_worker_stop();
+static void crb_worker_sig(int signo);
 
 
 typedef struct {
@@ -34,17 +41,12 @@ typedef struct {
 	void (*handler)(int signo);
 } crb_signal_t;
 
-
 crb_signal_t  signals[] = {
+    { SIGINT, crb_worker_sig },
     { SIGPIPE, SIG_IGN },
     { 0, NULL }
 };
 
-
-static void crb_worker_signals_init();
-static void crb_worker_reader_pool_init();
-static void crb_worker_sender_pool_init();
-static void _crb_worker_stop();
 
 void 
 crb_worker_create()
@@ -339,3 +341,17 @@ crb_worker_sender_pool_init()
 	
 	worker->active_sender = (crb_sender_t *)worker->senders->first->data;
 }
+
+static void
+crb_worker_sig(int signo)
+{
+	switch(signo) {
+		case SIGINT:
+			crb_worker_stop();
+			break;
+		default:
+			break; 
+	}
+}
+
+
