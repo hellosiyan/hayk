@@ -39,6 +39,10 @@ crb_client_init()
 void 
 crb_client_set_request(crb_client_t *client, crb_request_t *request)
 {
+	if ( client == NULL ) {
+		return;
+	}
+	
 	if ( client->request != NULL ) {
 		crb_request_unref(client->request);
 	}
@@ -68,6 +72,10 @@ crb_client_unref(crb_client_t *client)
 void 
 crb_client_close(crb_client_t *client) 
 {
+	if ( client == NULL || client->state == CRB_STATE_CLOSED || client->state == CRB_STATE_CLOSING ) {
+		return;
+	}
+	
 	client->state = CRB_STATE_CLOSING;
 	close(client->sock_fd);
 	client->state = CRB_STATE_CLOSED;
@@ -77,12 +85,18 @@ crb_client_close(crb_client_t *client)
 static void 
 crb_client_free(crb_client_t *client)
 {
+	if ( client == NULL ) {
+		return;
+	}
+	
 	crb_client_close(client);
 	
 	crb_buffer_free(client->buffer_in);
+	client->buffer_in = NULL;
 	
 	if ( client->request != NULL ) {		
 		crb_request_free(client->request);
+		client->request = NULL;
 	}
 	
 	free(client);

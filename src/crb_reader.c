@@ -168,15 +168,19 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
-	
+		
 	if ( client->state == CRB_STATE_OPEN ) {
 		uint8_t *close_frame;
 		int close_frame_length;
+		
+		client->state == CRB_STATE_CLOSING;
 	
 		close_frame = crb_ws_frame_close(&close_frame_length, 0);
 		
 		write(client->sock_fd, (char*)close_frame, close_frame_length);
 		free(close_frame);
+	} else {
+		client->state == CRB_STATE_CLOSING;
 	}
 	
 	crb_client_unref(client);
@@ -233,11 +237,11 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				crb_task_set_client(task, client);
 				crb_task_set_type(task, CRB_TASK_HANDSHAKE);
 				
-				crb_worker_queue_task(task);
-				
 				client->state = CRB_STATE_OPEN;
 				client->data_state = CRB_DATA_STATE_FRAME_BEGIN;
 				crb_buffer_clear(client->buffer_in);
+				
+				crb_worker_queue_task(task);
 			}
 			break;
 		case CRB_DATA_STATE_FRAME_BEGIN:

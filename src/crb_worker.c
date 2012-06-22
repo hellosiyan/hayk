@@ -254,7 +254,7 @@ crb_worker_register_channel(char *name)
 void
 crb_worker_on_client_connect(crb_client_t *client)
 {
-	client->state = CRB_STATE_OPEN;
+	client->state = CRB_STATE_CONNECTING;
 	crb_reader_add_client(worker->active_reader, client);
 	
 	/* TODO: remove; begin test code */
