@@ -10,13 +10,13 @@ struct crb_hash_item_s {
 	uint32_t key;
 	void *data;
 	
-	int ref;
+	int32_t ref;
 };
 
 typedef struct crb_hash_s crb_hash_t;
 struct crb_hash_s {
 	crb_hash_item_t **items;
-	ssize_t scale;
+	size_t scale;
 	
 	void (*item_add)(crb_hash_item_t *item);
 	void (*item_remove)(crb_hash_item_t *item);
@@ -29,11 +29,11 @@ struct crb_hash_cursor_s {
 	void (*item_add)(crb_hash_item_t *item);
 	void (*item_remove)(crb_hash_item_t *item);
 	
-	int col;
+	uint8_t col;
 	crb_hash_item_t *row;
 };
 
-crb_hash_t *crb_hash_init(ssize_t scale);
+crb_hash_t *crb_hash_init(size_t scale);
 void crb_hash_free(crb_hash_t *hash);
 void *crb_hash_insert(crb_hash_t *hash, void *data, void *key, int key_len);
 void *crb_hash_remove(crb_hash_t *hash, void *key, int key_len);

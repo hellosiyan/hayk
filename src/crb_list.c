@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "crb_list.h"
 #include "crb_atomic.h"
@@ -91,12 +92,6 @@ crb_list_pop(crb_list_t *list)
 	return data;
 }
 
-void
-crb_list_remove(crb_list_t *list, void *data)
-{
-	// TODO
-}
-
 void 
 crb_list_item_ref(crb_list_item_t *item)
 {
@@ -106,8 +101,8 @@ crb_list_item_ref(crb_list_item_t *item)
 void 
 crb_list_item_unref(crb_list_item_t *item) 
 {
-	int old_ref;
-	old_ref = __sync_sub_and_fetch( &(item->ref), 1 );
+	uint32_t old_ref;
+	old_ref = crb_atomic_sub_fetch( &(item->ref), 1 );
 	if ( old_ref == 0 ) {
 		free(item);
 	}

@@ -28,12 +28,12 @@ struct crb_client_s {
 	crb_client_state_e state;
 	crb_client_data_state_e data_state;
 	int sock_fd;
-	int id;
+	uint64_t id;
 	
 	crb_buffer_t *buffer_in;
 	crb_request_t *request;
 	
-	int ref;
+	uint32_t ref;
 };
 
 crb_client_t *crb_client_init();

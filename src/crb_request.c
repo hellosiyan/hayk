@@ -57,7 +57,7 @@ crb_request_init()
 }
 
 void
-crb_request_set_uri(crb_request_t *request, char *uri, ssize_t length)
+crb_request_set_uri(crb_request_t *request, char *uri, size_t length)
 {
 	if ( request->uri != NULL ) {
 		free(request->uri);
@@ -74,7 +74,7 @@ crb_request_set_uri(crb_request_t *request, char *uri, ssize_t length)
 }
 
 void 
-crb_request_add_header(crb_request_t *request, char *name, ssize_t name_length, char *value, ssize_t value_length)
+crb_request_add_header(crb_request_t *request, char *name, size_t name_length, char *value, size_t value_length)
 {
 	crb_header_t *header = crb_header_init();
 	
@@ -102,7 +102,7 @@ crb_request_add_header(crb_request_t *request, char *name, ssize_t name_length, 
 }
 
 crb_header_t *
-crb_request_get_header(crb_request_t *request, char *name, ssize_t name_length)
+crb_request_get_header(crb_request_t *request, char *name, size_t name_length)
 {
 	crb_header_t *header;
 	
@@ -124,7 +124,6 @@ crb_request_get_headers_string(crb_request_t *request, int *size)
 	
 	buffer = crb_buffer_init(1024);
 	
-	// TODO: remove debug code
 	crb_hash_cursor_t *cursor = crb_hash_cursor_init(request->headers);
 
 	while ( (header = crb_hash_cursor_next(cursor)) != NULL ) {
@@ -160,10 +159,10 @@ crb_request_ref(crb_request_t *request)
 void 
 crb_request_unref(crb_request_t *request)
 {
-	int old_ref;
-	old_ref = __sync_sub_and_fetch( &(request->ref), 1 );
+	uint32_t old_ref;
+	old_ref = crb_atomic_sub_fetch( &(request->ref), 1 );
 	
-	if ( old_ref <= 0 ) {
+	if ( old_ref == 0 ) {
 		crb_request_free(request);
 	}
 }
@@ -175,7 +174,6 @@ crb_request_free(crb_request_t *request)
 		free(request->uri);
 		request->uri = NULL;
 	}
-	
 	
 	/* Free headers */
 	crb_header_t *header;

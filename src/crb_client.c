@@ -62,8 +62,8 @@ crb_client_ref(crb_client_t *client)
 inline void 
 crb_client_unref(crb_client_t *client)
 {
-	int old_ref;
-	old_ref = __sync_sub_and_fetch( &(client->ref), 1 );
+	uint32_t old_ref;
+	old_ref = crb_atomic_sub_fetch( &(client->ref), 1 );
 	if ( old_ref == 0 ) {
 		crb_client_free(client);
 	}

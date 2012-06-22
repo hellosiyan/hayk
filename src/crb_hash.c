@@ -29,7 +29,7 @@ crb_hash_item_init()
 }
 
 crb_hash_t *
-crb_hash_init(ssize_t scale)
+crb_hash_init(size_t scale)
 {
     crb_hash_t *hash;
     crb_hash_item_t *tmp;
@@ -289,8 +289,8 @@ crb_hash_item_ref(crb_hash_item_t *item)
 inline void
 crb_hash_item_unref(crb_hash_item_t *item)
 {
-	int old_ref;
-	old_ref = __sync_sub_and_fetch( &(item->ref), 1 );
+	uint32_t old_ref;
+	old_ref = crb_atomic_sub_fetch( &(item->ref), 1 );
 	if ( old_ref == 0 ) {
 		crb_hash_item_free(item);
 	}

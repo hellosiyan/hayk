@@ -149,8 +149,8 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
 	crb_client_t *client;
 	crb_ws_frame_t *frame = task->data2;
-	ssize_t data_offset = 0;
-	ssize_t data_size = frame->data_length;
+	size_t data_offset = 0;
+	size_t data_size = frame->data_length;
 	int bytes_written;
 	
 	uint8_t *header;
@@ -193,6 +193,7 @@ crb_sender_task_handshake(crb_task_t *task)
 	char *headers;
 	
 	request = crb_request_init();
+	crb_request_ref(request);
 	client = task->client;
 	
 	/* Construct request */

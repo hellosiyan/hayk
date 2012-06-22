@@ -9,7 +9,7 @@ typedef struct crb_channel_s crb_channel_t;
 struct crb_channel_s {
 	char *name;
 	crb_hash_t *clients;
-	int client_count;
+	uint32_t client_count;
 };
 
 crb_channel_t *crb_channel_init();

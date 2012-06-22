@@ -23,16 +23,16 @@ struct crb_request_s {
     char *uri;
     crb_hash_t *headers;
 	
-	int ref;
+	uint32_t ref;
 };
 
 crb_header_t *crb_header_init();
 void crb_header_free(crb_header_t *header);
 
 crb_request_t *crb_request_init();
-void crb_request_set_uri(crb_request_t *request, char *uri, ssize_t length);
-void crb_request_add_header(crb_request_t *request, char *name, ssize_t name_length, char *value, ssize_t value_length);
-crb_header_t *crb_request_get_header(crb_request_t *request, char *name, ssize_t name_length);
+void crb_request_set_uri(crb_request_t *request, char *uri, size_t length);
+void crb_request_add_header(crb_request_t *request, char *name, size_t name_length, char *value, size_t value_length);
+crb_header_t *crb_request_get_header(crb_request_t *request, char *name, size_t name_length);
 char *crb_request_get_headers_string(crb_request_t *request, int *size);
 void crb_request_ref(crb_request_t *request);
 void crb_request_unref(crb_request_t *request);

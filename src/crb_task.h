@@ -30,7 +30,7 @@ typedef struct crb_task_queue_s crb_task_queue_t;
 struct crb_task_queue_s {
 	crb_task_t *first;
 	crb_task_t *last;
-	int length;
+	uint32_t length;
 };
 
 crb_task_t *crb_task_init();

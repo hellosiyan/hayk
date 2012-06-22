@@ -95,7 +95,7 @@ crb_channel_unsubscribe(crb_channel_t *channel, crb_client_t *client)
 	crb_hash_remove(channel->clients, &(client->id), sizeof(int));
 	
 	crb_client_unref(client);
-	crb_atomic_fetch_sub(&(channel->client_count), 1);
+	crb_atomic_sub_fetch(&(channel->client_count), 1);
 }
 
 crb_client_t *

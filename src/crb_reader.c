@@ -154,8 +154,7 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 {
 	struct epoll_event event;
 	
-	client->id = reader->client_count;
-	crb_atomic_fetch_add( &(reader->client_count), 1 );
+	client->id = crb_atomic_add_fetch( &(reader->client_count), 1 );
 	
 	crb_hash_insert(reader->clients, client, &(client->id), sizeof(int));
 	
@@ -187,6 +186,7 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 		client->state == CRB_STATE_CLOSING;
 	}
 	
+	crb_atomic_fetch_sub( &(reader->client_count), 1 );
 	crb_client_unref(client);
 }
 
@@ -302,7 +302,7 @@ crb_reader_parse_request(crb_client_t *client)
 	char *left, *right, *header_name;
 	crb_request_t *request;
 	int is_cr, is_crlf, trailing_ws = 0;
-	ssize_t header_name_length;
+	size_t header_name_length;
 	
 	if ( client->request == NULL ) {
 		request = crb_request_init();
@@ -743,7 +743,7 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
 	char * pos;
 	char c, ch, *last;
 	char *left, *right, *header_name;
-	ssize_t header_name_length;
+	size_t header_name_length;
     
     crb_list_t *commands;
     crb_header_t *tmp_header;

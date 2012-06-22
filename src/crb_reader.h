@@ -13,7 +13,7 @@ typedef struct crb_reader_s crb_reader_t;
 struct crb_reader_s {
 	pthread_t thread_id;
 	crb_hash_t *clients;
-	unsigned client_count;
+	uint32_t client_count;
 	int epoll_fd;
 	unsigned running:1;
 };
