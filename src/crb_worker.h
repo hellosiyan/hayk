@@ -7,6 +7,7 @@
 #include "crb_reader.h"
 #include "crb_sender.h"
 #include "crb_channel.h"
+#include "crb_config.h"
 
 typedef enum {
      CRB_WORKER_INIT = 0,
@@ -26,10 +27,12 @@ struct crb_worker_s {
 	
 	crb_reader_t *active_reader;
 	crb_sender_t *active_sender;
+	
+	crb_config_entry_t *config;
 };
 
 
-void crb_worker_create();
+void crb_worker_create(crb_config_entry_t *config);
 int crb_worker_run();
 int crb_worker_stop();
 void crb_worker_queue_task();

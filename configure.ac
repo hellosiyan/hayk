@@ -15,6 +15,10 @@ AM_PROG_CC_C_O
 # Checks for libraries.
 AC_CHECK_LIB(pthread, pthread_create)
 
+PKG_CHECK_MODULES([LIBCONFIGXX], [libconfig++ >= 1.4],,
+       AC_MSG_ERROR([libconfig++ 1.4 or newer not found.])
+     )
+
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h netinet/in.h stdlib.h sys/socket.h openssl/sha.h])
 
@@ -25,5 +29,6 @@ AC_CHECK_FUNCS([inet_ntoa socket])
 
 AC_CONFIG_FILES([Makefile
 				 src/Makefile
-				 tools/Makefile])
+				 tools/Makefile
+				 conf/Makefile])
 AC_OUTPUT

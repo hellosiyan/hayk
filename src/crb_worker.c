@@ -49,7 +49,7 @@ crb_signal_t  signals[] = {
 
 
 void 
-crb_worker_create()
+crb_worker_create(crb_config_entry_t *config)
 {
 	worker = malloc(sizeof(crb_worker_t));
 	
@@ -60,6 +60,8 @@ crb_worker_create()
 	worker->senders = crb_list_init();
 	
 	worker->active_reader = NULL;
+	
+	worker->config = config;
 	
 	crb_worker_signals_init();
 	crb_worker_reader_pool_init();
@@ -88,8 +90,8 @@ crb_worker_run()
 	
 	// listen address
 	address.sin_family = AF_INET;
-	address.sin_port = htons(SERVER_PORT);
-	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons( worker->config->port );
+	address.sin_addr.s_addr = worker->config->host.s_addr;
 	
 	sock_desc = socket( AF_INET, SOCK_STREAM, 0 );
 	worker->socket_in = sock_desc;

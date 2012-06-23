@@ -7,10 +7,10 @@
 #include <limits.h>
 #include <openssl/sha.h>
 
+#include "crb_crypt.h"
 #include "crb_sender.h"
 #include "crb_task.h"
 #include "crb_channel.h"
-#include "crb_crypt.h"
 #include "crb_ws.h"
 
 static void crb_sender_task_broadcast(crb_task_t *task);
