@@ -9,7 +9,6 @@
 #define CRB_SENDER_MAX_TASKS 10
 
 typedef struct crb_sender_s crb_sender_t;
-
 struct crb_sender_s {
 	pthread_t thread_id;
 	
@@ -19,7 +18,6 @@ struct crb_sender_s {
 	
 	unsigned running:1;
 };
-
 
 crb_sender_t *crb_sender_init();
 void crb_sender_free(crb_sender_t *sender);

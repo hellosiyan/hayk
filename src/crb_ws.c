@@ -16,23 +16,6 @@
     s[0] == c0 && s[1] == c1 && s[2] == c2 && s[3] == c3 \
         && s[4] == c4 && s[5] == c5 && s[6] == c6 && s[7] == c7
 
-
-static void
-bitprint(uint8_t *data, int len)
-{
-	uint8_t *start = data;
-	uint8_t x, y, i, z;
-	for (y = 0; y < len; y += 1) {
-		i = start[y];
-		printf("%i-", i);
-		for (x = 0; x < 8; x ++) {
-			z = 48 + ((i >> x)&1);
-			printf("%c", z);
-		}
-		printf("\n");
-	}
-}
-
 crb_ws_frame_t *
 crb_ws_frame_init()
 {
@@ -85,14 +68,17 @@ uint8_t *
 crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked)
 {
 	uint8_t *pos, *frame_data;
-	
 	uint64_t payload_len;
 	uint8_t opcode;
+	int is_masked;
 	union {
 		uint32_t raw;
 		uint8_t octets[4];
 	} mask;
-	int is_masked;
+	
+	if ( data == NULL ) {
+		return NULL;
+	}
 	
 	// define frame properties 
 	payload_len = data_length;
@@ -104,7 +90,6 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	} else {
 		is_masked = 0;
 	}
-	
 	
 	// define data length
 	*length = 2;
@@ -122,6 +107,10 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	}
 	
 	frame_data = malloc(*length * sizeof(uint8_t));
+	if ( frame_data == NULL ) {
+		return NULL;
+	}
+	
 	pos = frame_data;
 	
 	// Opcode, rsv, fin
@@ -184,6 +173,10 @@ crb_ws_frame_close(int *length, int masked)
 	}
 	
 	data = malloc(*length * sizeof(uint8_t));
+	if ( data == NULL ) {
+		return NULL;
+	}
+	
 	pos = data;
 	
 	// Opcode, rsv, fin
@@ -209,12 +202,15 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	uint16_t raw;
 	char *read_pos;
 	
+	if ( frame == NULL || buffer == NULL ) {
+		return CRB_PARSE_INCOMPLETE;
+	}
+	
 	read_pos = buffer->rpos;
 	
 	if ( buffer->used < 2 ) {
 		return CRB_PARSE_INCOMPLETE;
 	}
-	
 	
 	raw = * (uint16_t*) read_pos;
 	
@@ -280,7 +276,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	// Masking key
 	if ( frame->is_masked ) {
 		if ( buffer->used < (read_pos + 4) - buffer->ptr ) {
-			printf("Incomplete for Mask %i, required %i.\n", buffer->used, (read_pos + 4) - buffer->ptr);
 			return CRB_PARSE_INCOMPLETE;
 		}
 	
@@ -290,7 +285,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	// Payload
 	if ( buffer->used < (read_pos + frame->payload_len) - buffer->ptr ) {
-		printf("Incomplete for Payload %i, required %i.\n", buffer->used, (read_pos + frame->payload_len) - buffer->ptr);
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
@@ -321,6 +315,11 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		}
 		
 		frame->data = malloc(frame->payload_len + 1);
+		if ( frame->data == NULL ) {
+			crb_log_error("Cannot allocate memory for payload");
+			return CRB_ERROR_CRITICAL;
+		}
+		
 		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
 		frame->data_length = frame->payload_len;
 		frame->data[frame->data_length] = '\0';

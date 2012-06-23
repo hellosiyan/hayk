@@ -85,7 +85,13 @@ crb_request_add_header(crb_request_t *request, char *name, size_t name_length, c
 	if ( value_length == -1 ) {
 		value_length = strlen(value);
 	}
+	
 	header->value = malloc(value_length+1);
+	if ( header->value == NULL ) {
+		crb_log_error("Cannot allocate memory for request header value");
+		return;
+	}
+	
 	header->value = memcpy(header->value, value, value_length);
 	header->value[value_length] = '\0';
 	
@@ -93,10 +99,13 @@ crb_request_add_header(crb_request_t *request, char *name, size_t name_length, c
 		name_length = strlen(name);
 	}
 	header->name = malloc(name_length+1);
+	if ( header->name == NULL ) {
+		crb_log_error("Cannot allocate memory for request header name");
+		return;
+	}
+	
 	header->name = memcpy(header->name, name, name_length);
 	header->name[name_length] = '\0';
-	
-	// printf("ADD:\t{{%s}} %li\n\t{{%s}}\n", header->name, (name_length+1), header->value);
 	
 	crb_hash_insert(request->headers, header, header->name, name_length+1);
 }

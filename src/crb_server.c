@@ -46,9 +46,14 @@ crb_server_init()
 	}
 	server->restart = 0;
 	
+	if ( crb_log_init() == -1 ) {
+		fprintf(stderr, "Cannot open log file\n");
+		return NULL;
+	}
+	
 	server->config = crb_config_init();
 	if ( !crb_config_load(server->config) ) {
-		printf("Aborting\n");
+		crb_log_error("Cannot load config file");
 		return 0;
 	}
 	

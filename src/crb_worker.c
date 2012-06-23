@@ -114,7 +114,7 @@ crb_worker_run(crb_worker_t * worker)
 	if ( sock_desc == -1 ) {
 		perror("socket");
 		worker->state = CRB_WORKER_STOPPED;
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 	
 	result = setsockopt(sock_desc, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -123,21 +123,21 @@ crb_worker_run(crb_worker_t * worker)
 	if ( result == -1 ) {
 		perror("bind");
 		worker->state = CRB_WORKER_STOPPED;
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 	
 	result = listen( sock_desc, 100 );
 	if ( result == -1 ) {
 		perror("listen");
 		worker->state = CRB_WORKER_STOPPED;
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 	
 	flags = fcntl (sock_desc, F_GETFL, 0);
 	if (flags == -1) {
 		perror ("fcntl");
 		worker->state = CRB_WORKER_STOPPED;
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 
 	flags |= O_NONBLOCK;
@@ -145,7 +145,7 @@ crb_worker_run(crb_worker_t * worker)
 	if (result == -1) {
 		perror ("fcntl");
 		worker->state = CRB_WORKER_STOPPED;
-		return -1;
+		exit(EXIT_FAILURE);
 	}
 	
 	pfd.fd = sock_desc;
@@ -182,7 +182,7 @@ crb_worker_run(crb_worker_t * worker)
 			crb_worker_on_client_connect(client);
 		}
 	}
- 	
+	
  	_crb_worker_stop();
 
 	exit(0);

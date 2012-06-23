@@ -69,6 +69,11 @@ crb_channel_set_name(crb_channel_t *channel, char *name)
 	
 	length = strlen(name)+1;
 	channel->name = malloc(length);
+	if ( channel->name == NULL ) {
+		crb_log_error("Cannot allocate memory for channel name");
+		return;
+	}
+	
 	strcpy(channel->name, name);
 	channel->name[length-1] = '\0';
 }

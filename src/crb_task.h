@@ -12,7 +12,6 @@ typedef enum {
 } crb_task_type_e;
 
 typedef struct crb_task_s crb_task_t;
-
 struct crb_task_s {
 	crb_task_type_e type;
 	
@@ -26,7 +25,6 @@ struct crb_task_s {
 };
 
 typedef struct crb_task_queue_s crb_task_queue_t;
-
 struct crb_task_queue_s {
 	crb_task_t *first;
 	crb_task_t *last;

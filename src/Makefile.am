@@ -30,6 +30,8 @@ caribou_SOURCES =      \
     crb_config.h       \
     crb_ws.c	       \
     crb_ws.h       	   \
+    crb_log.c	       \
+    crb_log.h		   \
     crb_atomic.h        
 
 caribou_CFLAGS =       \

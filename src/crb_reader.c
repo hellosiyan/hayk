@@ -54,6 +54,7 @@ crb_reader_init()
     
     reader->epoll_fd = epoll_create1 (0);
 	if (reader->epoll_fd == -1) {
+		crb_log_error("Cannot create epoll descriptor");
 		free(reader);
 		return NULL;
 	}
@@ -80,15 +81,21 @@ crb_reader_loop(void *data)
 	buf[4095] = '\0';
 	
 	reader = (crb_reader_t *) data;
-	events = calloc (10, sizeof (struct epoll_event));
+	events = calloc (CRB_READER_EPOLL_MAX_EVENTS, sizeof (struct epoll_event));
+	if ( events == NULL ) {
+		crb_log_error("Cannot allocate epoll events array");
+		return 0;
+	}
 	
 	reader->running = 1;
 	while(reader->running) {
-		n = epoll_wait (reader->epoll_fd, events, 10, 250);
+		n = epoll_wait (reader->epoll_fd, events, CRB_READER_EPOLL_MAX_EVENTS, 250);
+		
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
-				write(1, "Drop client\n", 12);
+				crb_log_debug("Client closed connection");
+				
 				client = (crb_client_t *) events[i].data.ptr;
 				crb_reader_drop_client(reader, client);
 				continue;
@@ -104,12 +111,6 @@ crb_reader_loop(void *data)
 				while ( chars_read > 0 ) {
 					crb_buffer_append_string(client->buffer_in, (const char*)buf, chars_read);
 					chars_read = read(client->sock_fd, buf, 1024);
-				}
-				
-				if ( strcmp(client->buffer_in->rpos, "exit") == 0 || strcmp(client->buffer_in->rpos, "exit\n") == 0 ) {
-					printf("STOP commmand recieved\n");
-					crb_worker_stop( crb_worker_get() );
-					break;
 				}
 				
 				crb_reader_on_data(reader, client);
@@ -130,7 +131,6 @@ crb_reader_run(crb_reader_t *reader)
 	}
 	
 	pthread_create( &(reader->thread_id), NULL, crb_reader_loop, (void*) reader );
-	
 }
 
 void
@@ -153,6 +153,7 @@ void
 crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 {
 	struct epoll_event event;
+	int result;
 	
 	client->id = crb_atomic_add_fetch( &(reader->client_count), 1 );
 	
@@ -161,15 +162,23 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 	event.data.ptr = client;
 	event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP;
 	
-	epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
+	result = epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
+	if ( result == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
+		crb_log_error("Cannot add client to epoll - not enough memory");
+	}
 }
 
 void 
 crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 {
 	crb_worker_on_client_disconnect(client);
+	int result;
 	
 	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
+	if ( result == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
+		crb_log_error("Cannot add client to epoll - not enough memory");
+	}
+	
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
 		
 	if ( client->state == CRB_STATE_OPEN ) {
@@ -261,7 +270,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			} else if ( result == CRB_PARSE_DONE ) {
 				// Valid frame
 				if( frame->is_masked == 0 ) {
-					printf("Frame not masked\n");
+					crb_log_error("Received non-masked frame from client");
 					crb_ws_frame_free_with_data(frame);
 					break;
 				}
@@ -273,23 +282,26 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 					if ( frame->crb_type == CRB_WS_TYPE_DATA ) {
 						crb_reader_handle_data_frame(reader, client, frame);
 					} else if ( frame->crb_type == CRB_WS_TYPE_CONTROL ) {
-						// printf("CTL: %s\n---\n", frame->data);
 						crb_reader_handle_control_frame(reader, client, frame);
 					}
 				} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
-					printf("close frame\n");
+					// Close frame - end the connection
 					crb_ws_frame_free_with_data(frame);
 					crb_reader_drop_client(reader, client);
 				} else {
-					printf("unknown frame\n");
+					// Unsupported frame type
 					crb_ws_frame_free_with_data(frame);
 				}
-			} else {
-				printf("UNHANDLED!\n");
+			} else if (result == CRB_ERROR_CRITICAL) {
+				// Close client to try to recover
+				crb_ws_frame_free_with_data(frame);
+				crb_reader_drop_client(reader, client);
 			}
+			
 			break;
 		default:
-			printf("Unknown data status\n");
+			// pass
+			break;
 	}
 	
 }
@@ -337,7 +349,6 @@ crb_reader_parse_request(crb_client_t *client)
     for (; b->rpos < last; b->rpos++) {
     	p = b->rpos;
     	ch = *p;
-    	// printf("( %c ) %i\n", ch, state);
     	
     	switch(state) {
     		case sw_start:
@@ -348,7 +359,6 @@ crb_reader_parse_request(crb_client_t *client)
 		        }
 
 		        if (ch < 'A' || ch > 'Z') {
-		        	printf("INVALID METHOD\n");
 		            return CRB_ERROR_INVALID_METHOD;
 		        }
 
@@ -361,10 +371,9 @@ crb_reader_parse_request(crb_client_t *client)
 				        break;
     				}
     				
-	        		printf("METHOD NOT GET\n");
 					return CRB_ERROR_INVALID_METHOD;
     			} else if( ch < 'A' || ch > 'Z' ) {
-	        		printf("METHOD NOT GET\n");
+	        		// Method name must be GET
 					return CRB_ERROR_INVALID_METHOD;
     			}
     			break;
@@ -384,7 +393,7 @@ crb_reader_parse_request(crb_client_t *client)
 				    case ' ':
 				        break;
 				    default:
-				    	printf("INVALID REQUEST\n");
+				    	// character not allowed here
 				        return CRB_ERROR_INVALID_REQUEST;
 		        }
 		        break;
@@ -400,7 +409,6 @@ crb_reader_parse_request(crb_client_t *client)
 				    case '\n':
 				    case '\r':
 				    case '\0':
-				    	printf("INVALID REQUEST 2\n");
 				        return CRB_ERROR_INVALID_REQUEST;
 		        }
 		        break;
@@ -413,7 +421,6 @@ crb_reader_parse_request(crb_client_t *client)
 					case ' ':
 						break;
 					default:
-				    	printf("INVALID REQUEST 3\n");
 				        return CRB_ERROR_INVALID_REQUEST;
 				}
 		    	break;
@@ -428,12 +435,11 @@ crb_reader_parse_request(crb_client_t *client)
 						if ( p - left == 7 && crb_strcmp8(left, 'H', 'T', 'T', 'P', '/', '1', '.', '1') ) {
 							state = sw_header_crlf;
 						} else if ( p - left > 7 ) {
-							printf("INVALID REQUEST 4\n");
 							return CRB_ERROR_INVALID_REQUEST;
 						}
 						break;
 					default:
-						printf("INVALID REQUEST 5\n");
+						// character not part of "HTTP/1.1" identificator
 					    return CRB_ERROR_INVALID_REQUEST;
 		    	}
 		    	break;
@@ -457,7 +463,6 @@ crb_reader_parse_request(crb_client_t *client)
 		    	trailing_ws = 0;
     			switch(ch) {
     				case '\r':
-    					// is_cr = 1;break;
     					break;
     				case '\n':
     					if ( is_crlf ) {
@@ -501,14 +506,14 @@ crb_reader_parse_request(crb_client_t *client)
     				case ' ':
     				case '\t':
     					// separators, not allowed in header name token
-						printf("INVALID REQUEST: Wrong header name format\n");
+    					crb_log_debug("Invalid header name format");
 					    return CRB_ERROR_INVALID_REQUEST;
     				case ':':
     					// end of name
     					right = p;
     					header_name = left;
     					header_name_length = right-left;
-				        // printf("HEADER NAME:\t\t{{%s}}\n", header_name);
+    					
 				        state = sw_header_separator;
 				        break;
 				    default:
@@ -536,7 +541,6 @@ crb_reader_parse_request(crb_client_t *client)
     			switch(ch) {
     				case '\r':
     					trailing_ws++;
-    					//is_cr = 1;
     					break;
     				case '\n':
 						if(is_crlf) {
@@ -593,20 +597,20 @@ crb_reader_validate_request(crb_client_t *client)
 	
 	header = crb_request_get_header(request, CRB_WS_KEY, -1);
 	if ( header == NULL || header->value == NULL ) {
-		printf("INVALID KEY HEADER\n");
+		crb_log_debug("Invalid or missing Sec-WebSocket-Key header");
 		return CRB_ERROR_INVALID_REQUEST;
 	}
 	
 	header = crb_request_get_header(request, CRB_WS_VERSION, -1);
 	if ( header == NULL || header->value == NULL || !(crb_strcmp2(header->value, '1', '3')) ) {
-		printf("INVALID VERSION HEADER\n");
+		crb_log_debug("Invalid or missing Sec-WebSocket-Version header");
 		return CRB_ERROR_INVALID_REQUEST;
 	}
 	
 	/*
 	header = crb_request_get_header(request, CRB_WS_PROTOCOL, -1);
 	if ( header == NULL || header->value == NULL || strstr(header->value, "caribou") == NULL ) {
-		printf("INVALID PROTOCOL HEADER\n");
+		crb_log_debug("Invalid or missing Sec-WebSocket-Protocol header");
 		return CRB_ERROR_INVALID_REQUEST;
 	}
 	*/
@@ -622,11 +626,11 @@ crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_
 	
 	channel = crb_reader_parse_data_frame(frame);
 	if ( channel == NULL ) {
-		// printf("unknown channel\n");
+		// unknown channel name
 		crb_ws_frame_free_with_data(frame);
 		return;
 	} else if ( !crb_channel_client_is_subscribed(channel, client) ) {
-		// printf("not subscribed for this channel\n");
+		// not subscribed for this channel
 		crb_ws_frame_free_with_data(frame);
 		return;
 	}
@@ -658,7 +662,6 @@ crb_reader_parse_data_frame(crb_ws_frame_t *frame)
     
     for (pos = frame->data; pos < last; pos++) {
     	ch = *pos;
-    	// printf("( %c ) %i\n", ch, state);
     	
     	switch(state) {
     		case sw_start:
@@ -669,7 +672,7 @@ crb_reader_parse_data_frame(crb_ws_frame_t *frame)
 		        }
 
 		        if ( (ch < 'A' || 0x20 > 'Z') && (ch < 'a' || 0x20 > 'z') ) {
-		        	printf("INVALID CHANNEL NAME %c\n", ch);
+		        	crb_log_debug("Invalid channel name");
 		            return NULL;
 		        }
 
@@ -687,14 +690,11 @@ crb_reader_parse_data_frame(crb_ws_frame_t *frame)
     				case '}': case '\r':
     				case ' ': case '\t':
     					// separators, not allowed in channel name token
-						printf("INVALID REQUEST: Wrong channel name format\n");
+		        		crb_log_debug("Wrong channel name format");
 					    return NULL;
     				case '\n':
     					// end of name
     					channel_name_length = pos-channel_name;
-    					
-					    // write(1, channel_name, channel_name_length);
-					    // write(1, "\n", 1);
 					    
 				        return crb_worker_get_channel(channel_name, channel_name_length);
     			}
@@ -716,16 +716,12 @@ crb_reader_handle_control_frame(crb_reader_t *reader, crb_client_t *client, crb_
 	
 	command = (crb_header_t *) crb_list_pop(commands);
 	while ( command != NULL ) {
-		// printf("N: \"%s\" of %i\nV: %s\n", command->name, strlen(command->name), command->value);
-		
 		if ( strcmp(command->name, "SUBSCRIBE") == 0 ) {
 			channel = crb_worker_register_channel( command->value );
 			crb_channel_subscribe(channel, client);
-			printf("SUB %i for \"%s\"\n", client->id, channel->name);
 		} else if ( strcmp(command->name, "UNSUBSCRIBE") == 0 ) {
 			channel = crb_worker_register_channel( command->value );
 			crb_channel_unsubscribe(channel, client);
-			printf("UNSUB %i for \"%s\"\n", client->id, channel->name);
 		}
 		
 		crb_header_free(command);
@@ -764,7 +760,6 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
     
     for (pos = frame->data; pos < last; pos++) {
     	ch = *pos;
-    	//printf("( %c ) %i\n", ch, state);
     	
     	switch(state) {
     		case sw_start:
@@ -775,7 +770,6 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
 		        }
 
 		        if (ch < 'A' || ch > 'Z') {
-		        	printf("INVALID CONTROL HEADER\n");
 		            return commands;
 		        }
 
@@ -794,16 +788,12 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
     				case '\r': case '\n':
     				case ' ': case '\t':
     					// separators, not allowed in header name token
-						printf("INVALID REQUEST: Wrong header name format\n");
 					    return commands;
     				case ':':
     					// end of name
     					right = pos;
     					header_name = left;
     					header_name_length = right-left;
-    					
-					    //write(1, header_name, header_name_length);
-					    //write(1, "\n", 1);
 					    
 				        state = sw_header_separator;
 				        break;
@@ -840,12 +830,6 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
 					    tmp_header->value[right-left] = '\0';
 					    
 					    crb_list_push(commands, tmp_header);
-					    /*
-					    write(1, header_name, header_name_length);
-					    write(1, "\n", 1);
-					    write(1, left, right-left);
-					    write(1, "\n", 1);
-					    */
 					    
 					    left = pos + 1;
 					    state = sw_header_name;

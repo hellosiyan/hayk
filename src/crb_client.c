@@ -23,8 +23,10 @@ crb_client_init()
     client->state = CRB_STATE_CONNECTING;
     client->data_state = CRB_STATE_CONNECTING;
     client->request = NULL;
+    
     client->buffer_in = crb_buffer_init(CRB_READER_BUFFER_SIZE);
     if ( client->buffer_in == NULL ) {
+    	crb_log_error("Cannot allocate client buffer");
     	free(client);
     	return NULL;
     }

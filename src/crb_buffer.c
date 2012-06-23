@@ -38,7 +38,7 @@ crb_buffer_copy(crb_buffer_t *orig)
 	crb_buffer_t *buffer;
 	
 	buffer = malloc(sizeof(crb_buffer_t));
-	if ( buffer == NULL ) {
+	if ( buffer == NULL || orig == NULL ) {
 		return NULL;
 	}
 	
@@ -52,7 +52,7 @@ crb_buffer_copy(crb_buffer_t *orig)
 		return NULL;
 	}
 	
-	memcpy(buffer->ptr, orig->ptr, orig->size);
+	buffer->ptr = memcpy(buffer->ptr, orig->ptr, orig->size);
 	buffer->ptr[buffer->used - 1] = '\0';
 	
 	return buffer;
@@ -68,7 +68,7 @@ crb_buffer_copy_string(crb_buffer_t *buffer)
 		return NULL;
 	}
 	
-	memcpy(string, buffer->ptr, buffer->used);
+	string = memcpy(string, buffer->ptr, buffer->used);
 	string[buffer->used - 1] = '\0';
 	
 	return string;
@@ -80,7 +80,8 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 {
 	char *new_ptr;
 	int rpos_offset;
-	if ( !str ) {
+	
+	if ( buffer == NULL || str == NULL ) {
 		return -1;
 	} else if ( str_len == 0 ) {
 		return 0;
@@ -101,6 +102,7 @@ crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
 			printf("cannot alloc!\n");
 			return -1;
 		}
+		
 		buffer->ptr = new_ptr;
 		buffer->rpos = buffer->ptr + rpos_offset;
 	}

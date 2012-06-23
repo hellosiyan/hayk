@@ -12,6 +12,7 @@
 
 #include "crb_list.h"
 #include "crb_worker.h"
+#include "crb_log.h"
 
 #define CRB_CONFIG PACKAGE_CONF_FILE
 #define CRB_PIDFILE "/tmp/ws-caribou-VERSION.pid"

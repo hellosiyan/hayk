@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <openssl/sha.h>
 #include <signal.h>
+#include <string.h>
 
 #include "crb_crypt.h"
 #include "crb_sender.h"
@@ -91,7 +92,7 @@ crb_sender_loop(void *data)
 		if ( task ) {
 			switch(task->type) {
 				case CRB_TASK_SHUTDOWN:
-					// breaks out of the loop
+					// break out of the loop
 					sender->running = 0;
 					crb_task_free(task);
 					break;
@@ -146,21 +147,36 @@ crb_sender_stop(crb_sender_t *sender)
 
 static void
 crb_sender_task_broadcast(crb_task_t *task) {
-	crb_channel_t *channel = task->data;
-	crb_hash_cursor_t *cursor = crb_hash_cursor_init(channel->clients);
+	crb_channel_t *channel;
+	crb_hash_cursor_t *cursor;
 	crb_client_t *client;
-	crb_ws_frame_t *frame = task->data2;
-	size_t data_offset = 0;
-	size_t data_size = frame->data_length;
+	crb_ws_frame_t *frame;
+	
+	size_t data_offset, data_size;
 	int bytes_written;
 	
 	uint8_t *header;
 	int header_length;
 	
-	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0);
+	frame = task->data2;
+	channel = task->data;
 	
+	data_offset = 0;
+	data_size = frame->data_length;
+	
+	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0);
+	if ( header == NULL ) {
+		crb_log_error("Cannot create frame head");
+		
+		crb_ws_frame_free_with_data(frame);
+		crb_task_free(task);
+		return;
+	}
+	
+	cursor = crb_hash_cursor_init(channel->clients);
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
 		data_offset = 0;
+		data_size = frame->data_length;
 		
 		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
 			bytes_written = write(client->sock_fd, (char*)header, header_length);
@@ -194,6 +210,11 @@ crb_sender_task_handshake(crb_task_t *task)
 	char *headers;
 	
 	request = crb_request_init();
+	if ( request == NULL ) {
+		crb_log_error("Cannot create new request");
+		return;
+	}
+	
 	crb_request_ref(request);
 	client = task->client;
 	
@@ -206,24 +227,26 @@ crb_sender_task_handshake(crb_task_t *task)
 		crb_header_t *key_header;
 		char ws_sha1[SHA_DIGEST_LENGTH];
 		char *ws_base64;
-		char *ws_string = NULL;
-		int ws_string_length = 0,
-			ws_base64_length = 0;
+		int ws_base64_length = 0;
 		SHA_CTX sha1;
 		
 		// Compute SHA1
 		key_header = crb_request_get_header(task->client->request, CRB_WS_KEY, -1);
-		ws_string_length = asprintf(&ws_string, "%s%s", key_header->value, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 		
 		SHA1_Init(&sha1);
-		SHA1_Update(&sha1, ws_string, ws_string_length);
+		SHA1_Update(&sha1, key_header->value, strlen(key_header->value));
+		SHA1_Update(&sha1, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
 		SHA1_Final(ws_sha1, &sha1);
-		
-		free(ws_string);
 		
 		// Compute Base64
 		ws_base64_length = (((SHA_DIGEST_LENGTH + 2) / 3) * 4);
 		ws_base64 = malloc(ws_base64_length+1);
+		if ( ws_base64 == NULL ) {
+			crb_request_unref(request);
+			crb_task_free(task);
+			return;
+		}
+		
 		ws_base64_length = crb_encode_base64(ws_base64, ws_sha1, SHA_DIGEST_LENGTH);
 		
 		crb_request_add_header(request, "Sec-WebSocket-Accept", -1, ws_base64, ws_base64_length);

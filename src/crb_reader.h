@@ -1,6 +1,13 @@
 #ifndef __CRB_READER_H__
 #define __CRB_READER_H__ 1
 
+#include <unistd.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "crb_worker.h"
 #include "crb_hash.h"
 #include "crb_client.h"
@@ -8,6 +15,7 @@
 #include "crb_ws.h"
 
 #define CRB_READER_CLIENTS_SCALE 4
+#define CRB_READER_EPOLL_MAX_EVENTS 20
 
 typedef struct crb_reader_s crb_reader_t;
 struct crb_reader_s {

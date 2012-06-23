@@ -116,7 +116,6 @@ crb_task_queue_push(crb_task_queue_t *queue, crb_task_t *task)
 		queue->first = task;
 	}
 	
-	
 	queue->last = task;
 	queue->length ++;
 }

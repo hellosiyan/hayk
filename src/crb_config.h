@@ -18,7 +18,6 @@ struct crb_config_entry_s {
 	uint16_t port;
 	const char *origin;
 	uint32_t max_users;
-	unsigned log:1;
 };
 
 typedef struct crb_config_s crb_config_t;
@@ -29,10 +28,8 @@ struct crb_config_s {
 
 
 crb_config_entry_t * crb_config_entry_init();
-void crb_config_item_free(crb_config_entry_t *config);
 
 crb_config_t * crb_config_init();
 int crb_config_load(crb_config_t *config);
-void crb_config_free(crb_config_t *config);
 
 #endif /* __CRB_CONFIG_H__ */
