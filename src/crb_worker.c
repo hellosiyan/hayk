@@ -27,7 +27,7 @@
 #define CRB_WORKER_CHANNELS_SCALE 4
 
 
-static crb_worker_t *worker;
+static crb_worker_t *worker_inst;
 
 static void crb_worker_signals_init();
 static void crb_worker_reader_pool_init();
@@ -41,16 +41,17 @@ typedef struct {
 	void (*handler)(int signo);
 } crb_signal_t;
 
-crb_signal_t  signals[] = {
+static crb_signal_t  signals[] = {
     { SIGINT, crb_worker_sig },
     { SIGPIPE, SIG_IGN },
     { 0, NULL }
 };
 
 
-void 
+crb_worker_t *
 crb_worker_create(crb_config_entry_t *config)
 {
+	crb_worker_t * worker;
 	worker = malloc(sizeof(crb_worker_t));
 	
 	worker->state = CRB_WORKER_STOPPED;
@@ -63,20 +64,37 @@ crb_worker_create(crb_config_entry_t *config)
 	
 	worker->config = config;
 	
-	crb_worker_signals_init();
-	crb_worker_reader_pool_init();
-	crb_worker_sender_pool_init();
+	worker->pid = 0;
+	worker->socket_in = 0;
+	
+	return worker;
 }
 
 crb_worker_t *
 crb_worker_get()
 {
-	return worker;
+	return worker_inst;
 }
 
 int 
-crb_worker_run()
+crb_worker_run(crb_worker_t * worker)
 {
+	pid_t pid;
+	pid = fork();
+	
+	if ( pid != 0 ) {
+		return pid;
+	}
+	
+	worker_inst = worker;
+	worker->pid = pid; 
+	
+	printf("Start worker %i\n", getpid());
+	
+	crb_worker_signals_init();
+	crb_worker_reader_pool_init();
+	crb_worker_sender_pool_init();
+	
 	int sock_desc, new_desc;
 	int flags;
 	int result;
@@ -169,12 +187,18 @@ crb_worker_run()
  	
  	_crb_worker_stop();
 
-	return 0;
+	exit(0);
 }
 
 int 
-crb_worker_stop()
+crb_worker_stop(crb_worker_t * worker)
 {
+	if ( worker != NULL && worker->pid != 0 ) {
+		kill(worker->pid, SIGINT);
+		waitpid(worker->pid, NULL, 0);
+		return;
+	}
+	
 	worker->state = CRB_WORKER_STOPPING;
 	shutdown(worker->socket_in, SHUT_RDWR);
 }
@@ -182,7 +206,10 @@ crb_worker_stop()
 static void
 _crb_worker_stop()
 {
-	close(worker->socket_in);
+	crb_worker_t *worker;
+	
+	worker = worker_inst;
+	close(worker_inst->socket_in);
 	
 	{
 		/* Stop and close readers */
@@ -246,7 +273,6 @@ crb_worker_register_channel(char *name)
 	channel = crb_hash_exists_key(worker->channels, name, strlen(name));
 	
 	if ( channel == NULL ) {
-		printf("CREATE \"%s\"\n", name);
 		channel = crb_channel_init();
 		crb_channel_set_name(channel, name);
 		channel = crb_hash_insert(worker->channels, channel, name, strlen(name));
@@ -271,7 +297,7 @@ void
 crb_worker_on_client_connect(crb_client_t *client)
 {
 	client->state = CRB_STATE_CONNECTING;
-	crb_reader_add_client(worker->active_reader, client);
+	crb_reader_add_client(worker_inst->active_reader, client);
 }
 
 void
@@ -285,7 +311,7 @@ crb_worker_on_client_disconnect(crb_client_t *client)
 	}
 	
 	/* Unsubscribe client from all channels */
-	cursor = crb_hash_cursor_init(worker->channels);
+	cursor = crb_hash_cursor_init(worker_inst->channels);
 
 	while ( (channel = crb_hash_cursor_next(cursor)) != NULL ) {
 		crb_channel_unsubscribe(channel, client);
@@ -349,7 +375,7 @@ crb_worker_sig(int signo)
 {
 	switch(signo) {
 		case SIGINT:
-			crb_worker_stop();
+			crb_worker_stop(worker_inst);
 			break;
 		default:
 			break; 

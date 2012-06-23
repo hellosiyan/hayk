@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <openssl/sha.h>
+#include <signal.h>
 
 #include "crb_crypt.h"
 #include "crb_sender.h"

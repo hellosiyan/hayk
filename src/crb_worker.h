@@ -18,6 +18,7 @@ typedef enum {
 
 typedef struct crb_worker_s crb_worker_t;
 struct crb_worker_s {
+	pid_t pid;
 	crb_worker_state_e state;
 	int socket_in;
 	
@@ -32,9 +33,9 @@ struct crb_worker_s {
 };
 
 
-void crb_worker_create(crb_config_entry_t *config);
-int crb_worker_run();
-int crb_worker_stop();
+crb_worker_t * crb_worker_create(crb_config_entry_t *config);
+int crb_worker_run(crb_worker_t * worker);
+int crb_worker_stop(crb_worker_t * worker);
 void crb_worker_queue_task();
 crb_channel_t *crb_worker_register_channel(char *name);
 crb_channel_t *crb_worker_get_channel(char *name, int name_length);

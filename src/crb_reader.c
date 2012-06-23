@@ -108,7 +108,7 @@ crb_reader_loop(void *data)
 				
 				if ( strcmp(client->buffer_in->rpos, "exit") == 0 || strcmp(client->buffer_in->rpos, "exit\n") == 0 ) {
 					printf("STOP commmand recieved\n");
-					crb_worker_stop();
+					crb_worker_stop( crb_worker_get() );
 					break;
 				}
 				

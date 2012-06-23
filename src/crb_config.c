@@ -64,6 +64,8 @@ crb_config_load(crb_config_t *config)
 		}
 	}
 	
+  	config_destroy(&cfg);
+	
 	return 1;
 }
 
