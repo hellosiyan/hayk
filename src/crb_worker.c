@@ -87,9 +87,7 @@ crb_worker_run(crb_worker_t * worker)
 	}
 	
 	worker_inst = worker;
-	worker->pid = pid; 
-	
-	printf("Start worker %i\n", getpid());
+	worker->pid = pid;
 	
 	crb_worker_signals_init();
 	crb_worker_reader_pool_init();

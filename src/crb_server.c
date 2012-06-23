@@ -8,6 +8,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "crb_server.h"
 #include "crb_list.h"
@@ -42,7 +44,6 @@ crb_server_init()
 	if ( server == NULL ) {
 		return NULL;
 	}
-	
 	server->restart = 0;
 	
 	server->config = crb_config_init();
@@ -52,8 +53,6 @@ crb_server_init()
 	}
 	
 	server->workers = crb_list_init();
-	
-	server_inst = server;
 	
 	printf("Started server %i\n", getpid());
 	
@@ -75,7 +74,6 @@ crb_server_init()
 	
 		while ( item != NULL ) {
 			virt_config = (crb_config_entry_t *) item->data;
-			printf("Create Virtual\n");
 			crb_worker_t *worker;
 	
 			worker = crb_worker_create(virt_config);
@@ -88,12 +86,19 @@ crb_server_init()
 	
 	crb_server_signals_init();
 	
+	server_inst = server;
+	
 	return server;
 }
 
 void
 crb_server_start(crb_server_t *server)
 {
+	/* Deamonize */
+	// daemon(0, 1);
+	crb_write_pid();
+	
+	/* Loop */
 	do {
 		// start workers
 		{
@@ -111,6 +116,8 @@ crb_server_start(crb_server_t *server)
 		
 		pause();
 	} while ( server->restart );
+	
+	crb_clear_pid();
 }
 
 void
@@ -128,8 +135,8 @@ crb_server_restart(crb_server_t *server)
 static void 
 crb_server_signals_init()
 {
-    crb_signal_t      *sig;
-    struct sigaction   sa;
+    crb_signal_t  *sig;
+    struct sigaction sa;
 
     for (sig = signals; sig->signo != 0; sig++) {
         memset(&sa, 0, sizeof(struct sigaction));
@@ -168,11 +175,95 @@ _crb_server_stop(crb_server_t *server, int restart)
 	
 	item = server->workers->first;
 	
+	printf("Stopping server %i\n", getpid());
+	
 	while ( item != NULL ) {
 		worker = (crb_worker_t*) item->data;
 		crb_worker_stop(worker);
 		item = item->next;
 	}
 	
+	printf("Stopped server %i\n", getpid());
+	
 	server_inst->restart = restart;
+}
+
+void 
+crb_server_call_restart(pid_t pid)
+{
+	kill(pid, SIGUSR1);
+}
+
+void 
+crb_server_call_stop(pid_t pid)
+{
+	kill(pid, SIGINT);
+	while( crb_read_pid() > 0 ) {
+		sleep(1);
+	}
+}
+
+pid_t
+crb_read_pid()
+{
+	int pid_file;
+	ssize_t bytes_read;
+	pid_t pid;
+	
+	pid_file = open(CRB_PIDFILE,O_RDONLY|O_CREAT,0640);
+	
+	if ( pid_file < 0 ) {
+		printf("Unable to open pid file \"%s\"\n", CRB_PIDFILE );
+		exit(EXIT_FAILURE);
+	}
+	
+	bytes_read = read(pid_file, &pid, sizeof(pid_t));
+	close(pid_file);
+	
+	if ( bytes_read < sizeof(pid_t)) {
+		return 0;
+	}
+	
+	if ( kill(pid, 0) == -1 && errno == ESRCH ) {
+		return 0;
+	}
+	
+	return pid;
+}
+
+pid_t
+crb_write_pid()
+{
+	int pid_file;
+	ssize_t bytes_written;
+	pid_t pid = getpid();
+	
+	pid_file = open(CRB_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
+	
+	if ( pid_file < 0 ) {
+		printf("Unable to open pid file \"%s\"\n", CRB_PIDFILE );
+		exit(EXIT_FAILURE);
+	}
+	
+	bytes_written = write(pid_file, &pid, sizeof(pid_t));
+	close(pid_file);
+	
+	if ( bytes_written < sizeof(pid_t)) {
+		return 0;
+	}
+	
+	return pid;
+}
+
+void
+crb_clear_pid()
+{
+	int pid_file;
+	
+	pid_file = open(CRB_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
+	if ( pid_file < 0 ) {
+		return;
+	}
+	
+	close(pid_file);
 }

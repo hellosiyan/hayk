@@ -1,34 +1,89 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-
- #include <libconfig.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "crb_worker.h"
-#include "crb_config.h"
 #include "crb_server.h"
 
+static void crb_print_help_and_exit();
+static crb_server_command_e crb_parse_command_arg(char *command);
+
 int 
-main()
+main(int argc, char **argv)
 {
 	crb_server_t *server;
+	crb_server_command_e command;
+	pid_t server_pid;
 	
-	server = crb_server_init();
-	crb_server_start(server);
-	
-	/*
-	pid_t pid;
-	crb_config_t *conf;
-	
-	
-	conf = crb_config_init();
-	if ( !crb_config_load(conf) ) {
-		printf("Aborting\n");
-		return 0;
+	if ( argc != 2 ) {
+		/* Wrong number of arguments. */
+		crb_print_help_and_exit();
 	}
 	
-	crb_worker_create(conf->defaults);
-	crb_worker_run();
-	*/
-	return 0;
+	command = crb_parse_command_arg(argv[1]);
+	server_pid = crb_read_pid();
+	
+	if ( command == CRB_SERVER_START ) {
+		if ( server_pid > 0 ) {
+			printf("Server is already running.\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		server = crb_server_init();
+		crb_server_start(server);
+	} else if ( command == CRB_SERVER_STOP ) {
+		if ( server_pid == 0 ) {
+			printf("Server is not running.\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		printf("Stopping server ...\n");
+		crb_server_call_stop(server_pid);
+		printf("[OK]\n");
+	} else if ( command == CRB_SERVER_RESTART ) {
+		if ( server_pid == 0 ) {
+			printf("Server is not running.\n");
+			exit(EXIT_FAILURE);
+		}
+		
+		printf("Stopping server ...\n");
+		crb_server_call_stop(server_pid);
+		printf("[OK]\n");
+		
+		printf("Starting server ...\n");
+		server = crb_server_init();
+		crb_server_start(server);
+		printf("[OK]\n");
+	}
+	
+	exit(EXIT_SUCCESS);
 }
+
+static void
+crb_print_help_and_exit()
+{
+	printf("Caribou - WebSocket Server\nUsage:\n  caribou {start|stop|restart}\n");
+	exit(EXIT_SUCCESS);
+}
+
+static crb_server_command_e 
+crb_parse_command_arg(char *command)
+{
+	if ( command == NULL ) {
+		crb_print_help_and_exit();
+	}
+	
+	if ( strcmp(command, "start") == 0 ) {
+		return CRB_SERVER_START;
+	} else if ( strcmp(command, "stop") == 0 ) {
+		return CRB_SERVER_STOP;
+	} else if ( strcmp(command, "restart") == 0 ) {
+		return CRB_SERVER_RESTART;
+	}
+	
+	crb_print_help_and_exit();
+}
+
+
