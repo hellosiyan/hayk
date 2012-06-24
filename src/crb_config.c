@@ -87,34 +87,34 @@ crb_config_parse_group(config_setting_t *group, crb_config_entry_t *config)
 	
 	result = config_setting_lookup_string(group, "host", &str);
 	if ( result == CONFIG_FALSE ) {
-		crb_log_error("Missing host declaration\n");
+		crb_log_error("Missing host declaration");
 		return 0;
 	}
 	
 	if ( str[0] == '*' ) {
 		config->host.s_addr = INADDR_ANY;
 	} else if ( !inet_aton(str, &(config->host)) ) {
-		crb_log_error("Invalid host\n");
+		crb_log_error("Invalid host");
 		return 0;
 	}
 	
 	result = config_setting_lookup_int(group, "port", &num);
 	if ( result == CONFIG_FALSE ) {
-		crb_log_error("Missing port declaration\n");
+		crb_log_error("Missing port declaration");
 		return 0;
 	}
 	config->port = num;
 	
 	result = config_setting_lookup_string(group, "origin", &str);
 	if ( result == CONFIG_FALSE ) {
-		crb_log_error("Missing origin declaration\n");
+		crb_log_error("Missing origin declaration");
 		return 0;
 	}
 	config->origin = str;
 	
 	result = config_setting_lookup_int(group, "max-users", &num);
 	if ( result == CONFIG_FALSE ) {
-		crb_log_error("Missing max-users declaration\n");
+		crb_log_error("Missing max-users declaration");
 		return 0;
 	}
 	config->max_users = num;

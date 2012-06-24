@@ -47,19 +47,20 @@ crb_server_init()
 	server->restart = 0;
 	
 	if ( crb_log_init() == -1 ) {
-		fprintf(stderr, "Cannot open log file\n");
+		crb_log_error("Cannot open log file");
 		return NULL;
 	}
 	
 	server->config = crb_config_init();
 	if ( !crb_config_load(server->config) ) {
 		crb_log_error("Cannot load config file");
-		return 0;
+		return NULL;
 	}
 	
 	server->workers = crb_list_init();
 	
-	printf("Started server %i\n", getpid());
+	crb_log_mark("Caribou "VERSION" - server started");
+	printf("[OK]\n");
 	
 	// create default server
 	{
@@ -99,6 +100,10 @@ crb_server_init()
 void
 crb_server_start(crb_server_t *server)
 {
+	if ( server == NULL ) {
+		return;
+	}
+	
 	/* Deamonize */
 	// daemon(0, 1);
 	crb_write_pid();

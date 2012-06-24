@@ -28,15 +28,21 @@ main(int argc, char **argv)
 	if ( command == CRB_SERVER_START ) {
 		if ( server_pid > 0 ) {
 			printf("Server is already running.\n");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		
+		printf("Starting server ...\n");
 		server = crb_server_init();
+		if (server == NULL ) {
+			fprintf(stderr, "Error initializing server.\nAborting\n");
+			return EXIT_FAILURE;
+		}
+		
 		crb_server_start(server);
 	} else if ( command == CRB_SERVER_STOP ) {
 		if ( server_pid == 0 ) {
 			printf("Server is not running.\n");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		
 		printf("Stopping server ...\n");
@@ -45,7 +51,7 @@ main(int argc, char **argv)
 	} else if ( command == CRB_SERVER_RESTART ) {
 		if ( server_pid == 0 ) {
 			printf("Server is not running.\n");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 		
 		printf("Stopping server ...\n");
@@ -54,11 +60,15 @@ main(int argc, char **argv)
 		
 		printf("Starting server ...\n");
 		server = crb_server_init();
+		if (server == NULL ) {
+			fprintf(stderr, "Error initializing server.\nAborting\n");
+			return EXIT_FAILURE;
+		}
+		
 		crb_server_start(server);
-		printf("[OK]\n");
 	}
 	
-	exit(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
 
 static void
