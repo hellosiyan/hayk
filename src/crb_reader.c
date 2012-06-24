@@ -592,8 +592,10 @@ crb_reader_validate_request(crb_client_t *client)
 {
 	crb_request_t *request;
 	crb_header_t *header;
+	crb_worker_t *worker;
 	
 	request = client->request;
+	worker = crb_worker_get();
 	
 	header = crb_request_get_header(request, CRB_WS_KEY, -1);
 	if ( header == NULL || header->value == NULL ) {
@@ -605,6 +607,18 @@ crb_reader_validate_request(crb_client_t *client)
 	if ( header == NULL || header->value == NULL || !(crb_strcmp2(header->value, '1', '3')) ) {
 		crb_log_debug("Invalid or missing Sec-WebSocket-Version header");
 		return CRB_ERROR_INVALID_REQUEST;
+	}
+	
+	if ( worker->config->origins != NULL ) {
+		// Same-Origin policy
+		header = crb_request_get_header(request, CRB_WS_ORIGIN, -1);
+		if ( header == NULL || header->value == NULL ) {
+			crb_log_debug("Invalid or missing Origin header");
+			return CRB_ERROR_INVALID_REQUEST;
+		} else if( !crb_hash_exists_key(worker->config->origins, header->value, strlen(header->value)) ) {
+			crb_log_debug("Restricted origin");
+			return CRB_ERROR_INVALID_REQUEST;
+		}
 	}
 	
 	/*

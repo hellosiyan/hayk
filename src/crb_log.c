@@ -36,7 +36,6 @@ void
 crb_log_error(char *msg)
 {
 	dprintf(log_file, "[ERROR] %s\n", msg);
-	sync();
 }
 
 void

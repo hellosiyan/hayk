@@ -6,11 +6,6 @@
 #include "crb_buffer.h"
 #include "crb_hash.h"
 
-#define CRB_WS_KEY "SEC-WEBSOCKET-KEY"
-#define CRB_WS_VERSION "SEC-WEBSOCKET-VERSION"
-#define CRB_WS_PROTOCOL "SEC-WEBSOCKET-PROTOCOL"
-#define CRB_WS_EXTENSIONS "SEC-WEBSOCKET-EXTENSIONS"
-
 typedef struct crb_header_s crb_header_t;
 struct crb_header_s {
     char *name;

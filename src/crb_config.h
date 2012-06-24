@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 
 #include "crb_list.h"
+#include "crb_hash.h"
 
 #define CRB_CONFIG PACKAGE_CONF_FILE
 
@@ -16,7 +17,7 @@ typedef struct crb_config_entry_s crb_config_entry_t;
 struct crb_config_entry_s {
 	struct in_addr host;
 	uint16_t port;
-	const char *origin;
+	crb_hash_t *origins;
 	uint32_t max_users;
 };
 

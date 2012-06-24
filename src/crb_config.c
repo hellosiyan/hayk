@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <libconfig.h>
 
 #include "crb_config.h"
 #include "crb_list.h"
+#include "crb_hash.h"
 
 static int crb_config_parse_group(config_setting_t *group, crb_config_entry_t *config);
 
@@ -79,7 +81,8 @@ static int
 crb_config_parse_group(config_setting_t *group, crb_config_entry_t *config)
 {
 	const char *str;
-	int num, result;
+	config_setting_t *origins;
+	int num, result, i, length;
 	
 	if ( group == NULL || config == NULL ) {
 		return 0;
@@ -105,12 +108,20 @@ crb_config_parse_group(config_setting_t *group, crb_config_entry_t *config)
 	}
 	config->port = num;
 	
-	result = config_setting_lookup_string(group, "origin", &str);
-	if ( result == CONFIG_FALSE ) {
-		crb_log_error("Missing origin declaration");
-		return 0;
+	origins = config_setting_get_member(group, "origin");
+	config->origins = NULL;
+	if ( origins != CONFIG_FALSE ) {
+		length = config_setting_length(origins);
+		if ( length > 0 ) {
+			config->origins = crb_hash_init(5);
+			for (i = 0; i < length; i += 1) {
+				str = config_setting_get_string_elem(origins, i);
+				if ( str != NULL ) {
+					crb_hash_insert(config->origins, (void*)str, (void*)str, strlen(str));
+				}
+			}
+		}
 	}
-	config->origin = str;
 	
 	result = config_setting_lookup_int(group, "max-users", &num);
 	if ( result == CONFIG_FALSE ) {
@@ -134,7 +145,7 @@ crb_config_entry_init()
 	
 	entry->host.s_addr = INADDR_ANY;
 	entry->port = 0;
-	entry->origin = NULL;
+	entry->origins = NULL;
 	entry->max_users = 0;
 	
 	return entry;
