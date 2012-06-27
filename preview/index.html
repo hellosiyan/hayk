@@ -4,6 +4,20 @@
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
 	<title>Caribou Preview</title>
 	
+	<style type="text/css" media="screen">
+		* { font-family: sans-serif; }
+		input, select { padding: 3px 5px; border: 1px solid #666; border-radius: 3px; }
+		input[type=text]{ width: 200px; }
+		input[type=submit] { width: 120px; text-transform: uppercase; background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); cursor: pointer; }
+		select { width: 212px; padding: 3px 5px; background: #fff; }
+		form { margin-bottom: 10px; }
+		a.close { width: 120px; padding: 3px 5px; border: 1px solid #666; border-radius: 3px; text-transform: uppercase; background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); cursor: pointer; color: #000; font-size: 13px; text-decoration: none; }
+		
+		ul { margin: 0; padding: 0; }
+		ul li { list-style: none; }
+		ul li em { background-color: #eee; color: #000; font-size: 12px; }
+	</style>
+	
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script type="text/javascript" language="javascript" charset="utf-8">
 		jQuery(function($){
@@ -19,7 +33,7 @@
 			
 			$('#form-message').submit(function(){
 				var th = $(this);
-				ws_send(th.find('input[name=msg]').val());
+				ws_send(th.find('input[name=msg]').val(), th.find('select[name=msg_channel]').val());
 				return false;
 			});
 			
@@ -36,7 +50,10 @@
 			});
 			
 			$('a.close').click(function(){
-				ws.close();
+				if ( ws ) {
+					ws.close();
+				}
+				return false;
 			});
 			
 			function init_ws(ws) {
@@ -61,12 +78,24 @@
 				}
 			}
 			
-			function  ws_send(string) {
-				ws.send('DAT\ntest\n' + string);
+			function ws_send(string, channel) {
+				if( !ws ) {
+					return;
+				}
+				
+				if ( ws.send('DAT\n' + channel + '\n' + string) ) {
+					ws_log('** Message sent');
+				}
 			}
 			
 			function  ws_subscribe(channel) {
-				ws.send('CTL\nSubscribe: ' + channel + '\n');
+				if ( !ws || !channel ) {
+					return;
+				}
+				
+				if( ws.send('CTL\nSubscribe: ' + channel + '\n') ) {
+					$('select[name=channel]:not(:has(option[value="' + channel + '"])),select[name=msg_channel]:not(:has(option[value="' + channel + '"]))').append('<option value="' + channel + '">' + channel + '</option>');
+				}
 			}
 			
 			function  ws_unsubscribe(channel) {
@@ -75,29 +104,56 @@
 			
 			function ws_log(string) {
 				var date = new Date();
-				logs.prepend($('<li><em>' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds() + '</em> ' + string + '</li>'));
+				logs.prepend($('<li><em>' + date_format(date) + '</em> ' + string + '</li>'));
+			}
+			
+			function date_format(date) {
+				var tmp = 0;
+				var string = '';
+				
+				tmp = date.getHours();
+				if ( tmp < 10 ) {
+					tmp = '0' + tmp;
+				}
+				string += tmp + ':'
+				
+				tmp = date.getMinutes();
+				if ( tmp < 10 ) {
+					tmp = '0' + tmp;
+				}
+				string += tmp + ':'
+				
+				tmp = date.getSeconds();
+				if ( tmp < 10 ) {
+					tmp = '0' + tmp;
+				}
+				string += tmp;
+				
+				return string;
 			}
 		});
 	</script>
 </head>
 <body>
 	<form id="form-connection" action="" method="get">
-		<input type="text" name="url" value="ws://localhost:8080/test" />
+		<input type="text" name="url" value="ws://localhost:8080" />
 		<input type="submit" value="Init connection" />
 		<a href="#" class="close">Close</a>
 	</form>
 	<form id="form-channel-sub" action="" method="get">
-		<input type="text" name="channel" value="test" />
+		<input type="text" name="channel" placeholder="Channel name"/>
 		<input type="submit" value="subscribe" />
 	</form>
 	<form id="form-channel-unsub" action="" method="get">
-		<input type="text" name="channel" value="test" />
+		<select name="channel">
+		</select>
 		<input type="submit" value="unsubscribe" />
 	</form>
 	<form id="form-message" action="" method="get">
+		<select name="msg_channel">
+		</select>
 		<input type="text" name="msg" value="Hello!" />
-	
-		<p><input type="submit" value="Send" /></p>
+		<input type="submit" value="Send" />
 	</form>
 	<div class="results">
 		<ul>

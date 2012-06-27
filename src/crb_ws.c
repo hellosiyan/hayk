@@ -245,7 +245,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		
 		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
 		
-		if ( frame->payload_len < 4 ) {
+		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -261,13 +261,13 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		frame->payload_len <<= 32;
 		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
 		
-		if ( frame->payload_len < 4 ) {
+		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
 		read_pos = read_pos + 8; 
 	} else {
-		if ( frame->payload_len < 4 ) {
+		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
 			return CRB_PARSE_INCOMPLETE;
 		}
 		read_pos = read_pos + 2; 
@@ -289,7 +289,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	}
 	
 	// Payload / Unmask 
-	{
+	if( frame->opcode == CRB_WS_TEXT_FRAME ) {
 		int i, j;
 		uint8_t ch;
 		
@@ -310,7 +310,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			read_pos += 4;
 			frame->payload_len -= 4;
 		} else {
-			printf("Unrecognised frame type (dat/ctl).\n");
+			crb_log_debug("Unrecognised frame type (dat/ctl).\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
