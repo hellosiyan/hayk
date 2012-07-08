@@ -265,7 +265,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				// Wait for more data
 				crb_ws_frame_free_with_data(frame);
 			} else if ( result == CRB_ERROR_INVALID_OPCODE ) {
-				// TODO: skip frame
+				// skip frame
 				crb_ws_frame_free_with_data(frame);
 			} else if ( result == CRB_PARSE_DONE ) {
 				// Valid frame
