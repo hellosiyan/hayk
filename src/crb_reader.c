@@ -51,6 +51,7 @@ crb_reader_init()
 	reader->clients = crb_hash_init(CRB_READER_CLIENTS_SCALE);
     reader->running = 0;
     reader->client_count = 0;
+    reader->cid = 0;
     
     reader->epoll_fd = epoll_create1 (0);
 	if (reader->epoll_fd == -1) {
@@ -155,7 +156,7 @@ crb_reader_add_client(crb_reader_t *reader, crb_client_t *client)
 	struct epoll_event event;
 	int result;
 	
-	client->id = crb_atomic_add_fetch( &(reader->client_count), 1 );
+	client->id = crb_atomic_add_fetch( &(reader->cid), 1 );
 	
 	crb_hash_insert(reader->clients, client, &(client->id), sizeof(int));
 	
@@ -645,6 +646,7 @@ crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_
 		return;
 	} else if ( !crb_channel_client_is_subscribed(channel, client) ) {
 		// not subscribed for this channel
+		crb_log_debug("Not subscribed");
 		crb_ws_frame_free_with_data(frame);
 		return;
 	}

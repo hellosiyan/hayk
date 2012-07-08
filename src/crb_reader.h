@@ -22,6 +22,7 @@ struct crb_reader_s {
 	pthread_t thread_id;
 	crb_hash_t *clients;
 	uint32_t client_count;
+	uint32_t cid;
 	int epoll_fd;
 	unsigned running:1;
 };
