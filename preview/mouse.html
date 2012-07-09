@@ -8,7 +8,7 @@
 		* { padding: 0; margin: 0; outline: 0; font-family: sans-serif; }
 		body, html { background: #fff; }
 		#pane-cont { position: relative; margin: 0 auto; width: 600px; height: 300px; border: 1px solid #666; }
-		#pane-cont .pointer { display: block; position: absolute; width: 1px; height: 1px; border: 1px solid #000; }
+		#pane-cont .pointer { display: block; position: absolute; width: 1px; height: 1px; border: 5px solid #000; border-radius: 10px }
 		#pane { width: 600px; height: 300px; }
 	</style>
 	
@@ -18,7 +18,7 @@
 		jQuery(function($){
 			var pane_cont = $('#pane-cont'),
 				pane = $('#pane'),
-				pointer = $('#pane-cont .pointer');
+				pointers = {};
 			
 			var crb = new Caribou({
 				connected: function(){
@@ -29,13 +29,19 @@
 							state: 0
 						},
 						data = {
+							id: Math.round(Math.random()*10240),
+							color: 'rgba(' + Math.round(200*Math.random()) + ', ' + Math.round(200*Math.random()) + ', ' + Math.round(200*Math.random()) + ', 1)',
 							x: 0,
 							y: 0,
 							state: 0
 						};
 					
 					draw.addListener(function(data){
-						pointer.css({top: data.y, left: data.x, padding: data.state*5});
+						if( typeof pointers[data.id] == 'undefined' ) {
+							pointers[data.id] = $('<span class="pointer"></span>').appendTo(pane_cont);
+						}
+						
+						pointers[data.id].css({top: data.y, left: data.x, padding: data.state*5, margin: -5*data.state, 'border-color': data.color});
 					});
 					
 					pane_cont.mousemove(function(e){
@@ -66,7 +72,6 @@
 </head>
 <body>
 	<div id="pane-cont">
-		<span class="pointer"></span>
 		<canvas id="pane" width="600" height="300"/>
 	</div>
 </body>
