@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+	<title>Caribou Preview</title>
+	
+	<style type="text/css" media="screen">
+		* { padding: 0; margin: 0; outline: 0; font-family: sans-serif; }
+		body, html { background: #fff; }
+		#pane-cont { position: relative; margin: 0 auto; width: 600px; height: 300px; border: 1px solid #666; }
+		#pane-cont .pointer { display: block; position: absolute; width: 1px; height: 1px; border: 1px solid #000; }
+		#pane { width: 600px; height: 300px; }
+	</style>
+	
+	<script src="caribou.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script src="jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script type="text/javascript" language="javascript" charset="utf-8">
+		jQuery(function($){
+			var pane_cont = $('#pane-cont'),
+				pane = $('#pane'),
+				pointer = $('#pane-cont .pointer');
+			
+			var crb = new Caribou({
+				connected: function(){
+					var draw = crb.subscribe("draw"),
+						data_old = {
+							x: 0,
+							y: 0,
+							state: 0
+						},
+						data = {
+							x: 0,
+							y: 0,
+							state: 0
+						};
+					
+					draw.addListener(function(data){
+						pointer.css({top: data.y, left: data.x, padding: data.state*5});
+					});
+					
+					pane_cont.mousemove(function(e){
+						var offset = pane.offset();
+						data.x = e.pageX - offset.left;
+						data.y = e.pageY - offset.top;
+					}).mousedown(function(){
+						data.state = 1;
+					}).mouseup(function(){
+						data.state = 0;
+					});
+					
+					setInterval(function(){
+						if( data_old.x == data.x && data_old.y == data.y && data_old.state == data.state ) {
+							return;
+						}
+						
+						draw.send(data);
+						
+						data_old.x = data.x
+						data_old.y = data.y
+						data_old.state = data.state
+					}, 10);
+				}
+			});
+		});
+	</script>
+</head>
+<body>
+	<div id="pane-cont">
+		<span class="pointer"></span>
+		<canvas id="pane" width="600" height="300"/>
+	</div>
+</body>
+</html>

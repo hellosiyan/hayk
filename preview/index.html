@@ -5,160 +5,151 @@
 	<title>Caribou Preview</title>
 	
 	<style type="text/css" media="screen">
-		* { font-family: sans-serif; }
+		* { font-family: sans-serif; margin: 0; padding: 0; }
+		html, body { font-size: 14px; color: #000; }
+		.wrapper { width: 600px; margin: 15px auto 0; }
 		input, select { padding: 3px 5px; border: 1px solid #666; border-radius: 3px; }
 		input[type=text]{ width: 200px; }
-		input[type=submit] { width: 120px; text-transform: uppercase; background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); cursor: pointer; }
+		input[type=submit] { width: 120px; text-transform: uppercase; background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); background: -moz-linear-gradient(top, #eeeeee 0%,#cccccc 100%); cursor: pointer; }
 		select { width: 212px; padding: 3px 5px; background: #fff; }
 		form { margin-bottom: 10px; }
-		a.close { width: 120px; padding: 3px 5px; border: 1px solid #666; border-radius: 3px; text-transform: uppercase; background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); cursor: pointer; color: #000; font-size: 13px; text-decoration: none; }
 		
 		ul { margin: 0; padding: 0; }
 		ul li { list-style: none; }
-		ul li em { background-color: #eee; color: #000; font-size: 12px; }
+		ul li .date { float: left; display: block; padding: 3px; font-size: 11px; background: #eee; color: #999; }
+		ul li .channel { margin-left: 8px; float: left; font-size: 13px; color: #999; }
+		ul li .message { display: block; margin: 8px 0 15px; clear: both; color: #000; font-size: 14px; } 
 	</style>
 	
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script src="caribou.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script src="jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script type="text/javascript" language="javascript" charset="utf-8">
 		jQuery(function($){
-			var ws;
-			var logs = $('.results ul');
+			var pane_cont = $('#pane-cont'),
+				pane = $('#pane'),
+				pointer = $('#pane-cont .pointer');
 			
-			$('#form-connection').submit(function(){
-				var th = $(this);
-				ws = new WebSocket(th.find('input[name=url]').val());
-				init_ws(ws);
-				return false;
+			var crb = new Caribou({
+				connected: function(){
+					var channels = {},
+						draw = crb.subscribe("draw"),
+						results = $('.results ul');
+					
+					$('#form-channel-sub').submit(function(){
+						var name = $(this).find('input[name=channel]').val();
+						
+						if ( !name || typeof channels[name] != 'undefined' ) {
+							console.log('exists');
+							return false;
+						}
+						
+						channels[name] = crb.subscribe(name);
+						channels[name].addListener(function(data){
+							log_message(this.name, data)
+						});
+						
+						$('select[name=msg_channel], select[name=channel_name]').prepend('<option name="' + name + '">' + name + '</option>');
+						$(this).find('input[name=channel]').val('');
+						
+						return false;
+					});
+					
+					$('#form-unchannel-sub').submit(function(){
+						var name = $(this).find('select[name=channel_name]').val();
+						
+						if ( !name || typeof channels[name] == 'undefined' ) {
+							console.log('not exists');
+							return false;
+						}
+						
+						crb.unsubscribe(name);
+						delete channels[name];
+						$('select[name=msg_channel] option[name="' + name + '"], select[name=channel_name] option[name="' + name + '"]').remove();
+						
+						return false;
+					});
+					
+					$('#form-message').submit(function(){
+						var th = $(this),
+							name = th.find('select[name=msg_channel]').val();
+							msg = th.find('input[name=msg]').val();
+						
+						if ( !name || typeof channels[name] == 'undefined' ) {
+							console.log('Моля, изберете канал!');
+							return false;
+						} else if ( !msg ) {
+							// alert('Моля, въведете съобщение!');
+							return false;
+						}
+						
+						channels[name] = crb.subscribe(name);
+						channels[name].send(msg);
+						log_message(name, msg)
+						
+						th.find('input[name=msg]').val('');
+						
+						return false;
+					});
+					
+					function log_message(channel, message) {
+						var d = date_format(new Date());
+						results.prepend('<li><span class="date">' + d + '</span><span class="channel"> по канал ' + channel + '</span><span class="message">' + message + '</span></li>');
+						console.log( results.find('li:gt(10)') );
+						results.find('li:gt(6):not(:animated)').fadeOut(function(){
+							$(this).remove();
+						})
+					}
+					
+					function date_format(date) {
+						var tmp = 0;
+						var string = '';
+				
+						tmp = date.getHours();
+						if ( tmp < 10 ) {
+							tmp = '0' + tmp;
+						}
+						string += tmp + ':'
+				
+						tmp = date.getMinutes();
+						if ( tmp < 10 ) {
+							tmp = '0' + tmp;
+						}
+						string += tmp + ':'
+				
+						tmp = date.getSeconds();
+						if ( tmp < 10 ) {
+							tmp = '0' + tmp;
+						}
+						string += tmp;
+				
+						return string;
+					}
+				}
 			});
-			
-			$('#form-message').submit(function(){
-				var th = $(this);
-				ws_send(th.find('input[name=msg]').val(), th.find('select[name=msg_channel]').val());
-				return false;
-			});
-			
-			$('#form-channel-sub').submit(function(){
-				var th = $(this);
-				ws_subscribe(th.find('input[name=channel]').val());
-				return false;
-			});
-			
-			$('#form-channel-unsub').submit(function(){
-				var th = $(this);
-				ws_unsubscribe(th.find('input[name=channel]').val());
-				return false;
-			});
-			
-			$('a.close').click(function(){
-				if ( ws ) {
-					ws.close();
-				}
-				return false;
-			});
-			
-			function init_ws(ws) {
-				ws.onopen = function(e){
-					console.log('onopen', e);
-					ws_log('** Connected to ' + e.target.url);
-				}
-			
-				ws.onerror = function(a, b){
-					console.log('onerror', a, b);
-					ws_log('** Error: ');
-				}
-			
-				ws.onmessage = function(e){
-					console.log('onmessage', e);
-					ws_log(e.data);
-				}
-			
-				ws.onclose = function(e){
-					console.log( e );
-					ws_log('** Closed');
-				}
-			}
-			
-			function ws_send(string, channel) {
-				if( !ws ) {
-					return;
-				}
-				
-				if ( ws.send('DAT\n' + channel + '\n' + string) ) {
-					ws_log('** Message sent');
-				}
-			}
-			
-			function  ws_subscribe(channel) {
-				if ( !ws || !channel ) {
-					return;
-				}
-				
-				if( ws.send('CTL\nSubscribe: ' + channel + '\n') ) {
-					$('select[name=channel]:not(:has(option[value="' + channel + '"])),select[name=msg_channel]:not(:has(option[value="' + channel + '"]))').append('<option value="' + channel + '">' + channel + '</option>');
-				}
-			}
-			
-			function  ws_unsubscribe(channel) {
-				ws.send('CTL\nUnsubscribe: ' + channel + '\n');
-			}
-			
-			function ws_log(string) {
-				var date = new Date();
-				logs.prepend($('<li><em>' + date_format(date) + '</em> ' + string + '</li>'));
-			}
-			
-			function date_format(date) {
-				var tmp = 0;
-				var string = '';
-				
-				tmp = date.getHours();
-				if ( tmp < 10 ) {
-					tmp = '0' + tmp;
-				}
-				string += tmp + ':'
-				
-				tmp = date.getMinutes();
-				if ( tmp < 10 ) {
-					tmp = '0' + tmp;
-				}
-				string += tmp + ':'
-				
-				tmp = date.getSeconds();
-				if ( tmp < 10 ) {
-					tmp = '0' + tmp;
-				}
-				string += tmp;
-				
-				return string;
-			}
 		});
 	</script>
 </head>
 <body>
-	<form id="form-connection" action="" method="get">
-		<input type="text" name="url" value="ws://localhost:8080" />
-		<input type="submit" value="Init connection" />
-		<a href="#" class="close">Close</a>
-	</form>
+<div class="wrapper">
 	<form id="form-channel-sub" action="" method="get">
-		<input type="text" name="channel" placeholder="Channel name"/>
-		<input type="submit" value="subscribe" />
+		<input type="text" name="channel" placeholder="Име на канал"/>
+		<input type="submit" value="Записване" />
 	</form>
-	<form id="form-channel-unsub" action="" method="get">
-		<select name="channel">
+	<form id="form-unchannel-sub" action="" method="get">
+		<select name="channel_name">
 		</select>
-		<input type="submit" value="unsubscribe" />
+		<input type="submit" value="Отписване" />
 	</form>
 	<form id="form-message" action="" method="get">
 		<select name="msg_channel">
 		</select>
 		<input type="text" name="msg" value="Hello!" />
-		<input type="submit" value="Send" />
+		<input type="submit" value="Изпращане" />
 	</form>
 	<div class="results">
 		<ul>
-			
 		</ul>
 	</div>
+</div>
 </body>
 </html>
