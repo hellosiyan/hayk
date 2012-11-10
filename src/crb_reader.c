@@ -274,6 +274,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			} else if ( result == CRB_ERROR_INVALID_OPCODE ) {
 				// skip frame
 				crb_ws_frame_free_with_data(frame);
+				crb_reader_drop_client(reader, client);
 			} else if (result == CRB_ERROR_CRITICAL) {
 				// Close client to try to recover
 				crb_ws_frame_free_with_data(frame);
