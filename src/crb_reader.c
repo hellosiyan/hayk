@@ -226,8 +226,6 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 	
 	frame = NULL;
 	
-	printf("data state: %i (%i, %i)\n", client->data_state, CRB_DATA_STATE_HANDSHAKE, CRB_DATA_STATE_FRAME_BEGIN);
-
 	switch(client->data_state) {
 		case CRB_DATA_STATE_HANDSHAKE:
 			result = crb_reader_parse_request(client);
@@ -266,8 +264,6 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			frame = crb_ws_frame_init();
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
 			
-			printf("Parse result: %i (%i, %i, %i, %i)\n", result, CRB_PARSE_INCOMPLETE, CRB_ERROR_INVALID_OPCODE, CRB_PARSE_DONE, CRB_ERROR_CRITICAL);
-
 			if ( result == CRB_PARSE_INCOMPLETE ) {
 				// Wait for more data
 				crb_ws_frame_free_with_data(frame);
@@ -292,10 +288,8 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 					break;
 				}
 
-				// crb_buffer_trim_left(client->buffer_in);
+				crb_buffer_trim_left(client->buffer_in);
 
-				printf(" opcode: %i (%i, %i)\n", frame->opcode, CRB_WS_TEXT_FRAME, CRB_WS_CLOSE_FRAME);
-				
 				// take action based on frame type
 				if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
 					if ( frame->crb_type == CRB_WS_TYPE_DATA ) {

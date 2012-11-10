@@ -205,14 +205,12 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	char *read_pos;
 	
 	if ( frame == NULL || buffer == NULL ) {
-		printf(" incomplete 1\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
 	read_pos = buffer->rpos;
 	
 	if ( buffer->used < 2 ) {
-		printf(" incomplete 2\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
@@ -227,7 +225,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		case CRB_WS_PING_FRAME: frame->opcode = CRB_WS_PING_FRAME; break;
 		case CRB_WS_PONG_FRAME: frame->opcode = CRB_WS_PONG_FRAME; break;
 		default:
-			printf(" invalid 1\n");
 			return CRB_ERROR_INVALID_OPCODE;
 	}
 
@@ -248,14 +245,12 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		// 16bit length
 		// require the next 2 bytes
 		if ( buffer->used < 4 ) {
-			printf(" incomplete 3\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
 		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
 		
 		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			printf(" incomplete 4\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -264,7 +259,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		// 64bit length
 		// require the next 8 bytes
 		if ( buffer->used < 10 ) {
-			printf(" incomplete 5\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -273,23 +267,21 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
 		
 		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			printf(" incomplete 6\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
 		read_pos = read_pos + 10; 
 	} else {
-		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			printf(" incomplete 7\n");
-			// return CRB_PARSE_INCOMPLETE;
-		}
+		// // Caribou specific
+		// if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
+		// 	return CRB_PARSE_INCOMPLETE;
+		// }
 		read_pos = read_pos + 2; 
 	}
 	
 	// Masking key
 	if ( frame->is_masked ) {
 		if ( buffer->used < (read_pos + 4) - buffer->ptr ) {
-			printf(" incomplete 8\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 	
@@ -299,7 +291,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	// Payload
 	if ( buffer->used <= (read_pos + frame->payload_len) - buffer->ptr ) {
-			printf(" incomplete 9\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
@@ -308,8 +299,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		int i, j;
 		uint8_t ch;
 
-		printf("Payload: %i\n", frame->payload_len);
-		
 		for (i = 0; i < frame->payload_len; i += 1) {
 			j = i%4;
 			ch = (*(u_char*)(read_pos+i))^frame->mask.octets[j];
@@ -345,8 +334,6 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	} else if( frame->opcode == CRB_WS_PING_FRAME  ) {
 		int i, j;
 		uint8_t ch;
-
-		printf("Payload: %i\n", frame->payload_len);
 
 		if ( frame->payload_len > 125 ) {
 			// Control frames are allowed payload up to 125 bytes
