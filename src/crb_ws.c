@@ -230,6 +230,9 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			printf(" invalid 1\n");
 			return CRB_ERROR_INVALID_OPCODE;
 	}
+
+	// RSV bits
+	frame->rsv = (raw&112)>>4;
 	
 	// Mask
 	if ( raw & 256 == 0 ) {

@@ -284,6 +284,11 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 					crb_log_error("Received non-masked frame from client");
 					crb_ws_frame_free_with_data(frame);
 					break;
+				} else if ( frame->rsv > 0 ) {
+					crb_log_error("Received rsv!=0 with no extension negotiated");
+					crb_ws_frame_free_with_data(frame);
+					crb_reader_drop_client(reader, client);
+					break;
 				}
 
 				// crb_buffer_trim_left(client->buffer_in);

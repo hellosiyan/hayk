@@ -29,6 +29,7 @@
 
 typedef struct crb_ws_frame_s crb_ws_frame_t;
 struct crb_ws_frame_s {
+	uint8_t rsv;
 	uint64_t payload_len;
 	uint8_t opcode;
 	uint8_t crb_type;
