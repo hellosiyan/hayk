@@ -34,6 +34,7 @@ static void crb_reader_on_data(crb_reader_t *reader, crb_client_t *client);
 static int crb_reader_parse_request(crb_client_t *client);
 static int crb_reader_validate_request(crb_client_t *client);
 static int crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame);
+static int crb_reader_handle_ping_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame);
 static crb_channel_t * crb_reader_parse_data_frame(crb_ws_frame_t *frame);
 static int crb_reader_handle_control_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame);
 static crb_list_t * crb_reader_parse_control_frame(crb_ws_frame_t *frame);
@@ -108,12 +109,12 @@ crb_reader_loop(void *data)
 				if ( chars_read == 0 ) {
 					continue;
 				}
-				
+
 				while ( chars_read > 0 ) {
 					crb_buffer_append_string(client->buffer_in, (const char*)buf, chars_read);
 					chars_read = read(client->sock_fd, buf, 1024);
 				}
-				
+
 				crb_reader_on_data(reader, client);
 			}
 		}
@@ -261,6 +262,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			}
 			break;
 		case CRB_DATA_STATE_FRAME_BEGIN:
+			parse_frame_from_buffer:
 			frame = crb_ws_frame_init();
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
 			
@@ -272,6 +274,10 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			} else if ( result == CRB_ERROR_INVALID_OPCODE ) {
 				// skip frame
 				crb_ws_frame_free_with_data(frame);
+			} else if (result == CRB_ERROR_CRITICAL) {
+				// Close client to try to recover
+				crb_ws_frame_free_with_data(frame);
+				crb_reader_drop_client(reader, client);
 			} else if ( result == CRB_PARSE_DONE ) {
 				// Valid frame
 				if( frame->is_masked == 0 ) {
@@ -279,31 +285,31 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 					crb_ws_frame_free_with_data(frame);
 					break;
 				}
-				
-				crb_buffer_trim_left(client->buffer_in);
+
+				// crb_buffer_trim_left(client->buffer_in);
 
 				printf(" opcode: %i (%i, %i)\n", frame->opcode, CRB_WS_TEXT_FRAME, CRB_WS_CLOSE_FRAME);
 				
 				// take action based on frame type
 				if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
-					printf("  type: %i (%i, %i, %i)\n", frame->crb_type, CRB_WS_TYPE_DATA, CRB_WS_BIN_FRAME, CRB_WS_TYPE_CONTROL);
 					if ( frame->crb_type == CRB_WS_TYPE_DATA ) {
 						crb_reader_handle_data_frame(reader, client, frame);
 					} else if ( frame->crb_type == CRB_WS_TYPE_CONTROL ) {
 						crb_reader_handle_control_frame(reader, client, frame);
 					}
+				} else if ( frame->opcode == CRB_WS_PING_FRAME ) {
+					crb_reader_handle_ping_frame(reader, client, frame);
 				} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
 					// Close frame - end the connection
 					crb_ws_frame_free_with_data(frame);
 					crb_reader_drop_client(reader, client);
+					break;
 				} else {
 					// Unsupported frame type
 					crb_ws_frame_free_with_data(frame);
 				}
-			} else if (result == CRB_ERROR_CRITICAL) {
-				// Close client to try to recover
-				crb_ws_frame_free_with_data(frame);
-				crb_reader_drop_client(reader, client);
+
+				goto parse_frame_from_buffer;
 			}
 			
 			break;
@@ -669,6 +675,20 @@ crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_
 	crb_task_set_client(task, client);
 	crb_task_set_type(task, CRB_TASK_BROADCAST);
 	crb_task_set_data(task, channel);
+	crb_task_set_data2(task, frame);
+
+	crb_worker_queue_task(task);
+}
+
+static int
+crb_reader_handle_ping_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame)
+{
+	crb_task_t *task;
+	
+	task = crb_task_init();
+	crb_task_set_client(task, client);
+	crb_task_set_type(task, CRB_TASK_PONG);
+	crb_task_set_data(task, NULL);
 	crb_task_set_data2(task, frame);
 
 	crb_worker_queue_task(task);

@@ -295,7 +295,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	}
 	
 	// Payload
-	if ( buffer->used < (read_pos + frame->payload_len) - buffer->ptr ) {
+	if ( buffer->used <= (read_pos + frame->payload_len) - buffer->ptr ) {
 			printf(" incomplete 9\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
@@ -315,20 +315,20 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		
 		// detect message type (data or control)
 		// remove the first 4 characters for the type id from the plain message
-		if ( 1 ) {
+		// if ( 1 ) {
 			frame->crb_type = CRB_WS_TYPE_DATA;
-		} else if ( crb_strcmp3(read_pos, 'D', 'A', 'T') ) {
-			frame->crb_type = CRB_WS_TYPE_DATA;
-			read_pos += 4;
-			frame->payload_len -= 4;
-		} else if ( crb_strcmp3(read_pos, 'C', 'T', 'L') ) {
-			frame->crb_type = CRB_WS_TYPE_CONTROL;
-			read_pos += 4;
-			frame->payload_len -= 4;
-		} else {
-			crb_log_debug("Unrecognised frame type (dat/ctl).\n");
-			return CRB_PARSE_INCOMPLETE;
-		}
+		// } else if ( crb_strcmp3(read_pos, 'D', 'A', 'T') ) {
+		// 	frame->crb_type = CRB_WS_TYPE_DATA;
+		// 	read_pos += 4;
+		// 	frame->payload_len -= 4;
+		// } else if ( crb_strcmp3(read_pos, 'C', 'T', 'L') ) {
+		// 	frame->crb_type = CRB_WS_TYPE_CONTROL;
+		// 	read_pos += 4;
+		// 	frame->payload_len -= 4;
+		// } else {
+		// 	crb_log_debug("Unrecognised frame type (dat/ctl).\n");
+		// 	return CRB_PARSE_INCOMPLETE;
+		// }
 		
 		frame->data = malloc(frame->payload_len + 1);
 		if ( frame->data == NULL ) {
@@ -336,6 +336,34 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 			return CRB_ERROR_CRITICAL;
 		}
 		
+		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
+		frame->data_length = frame->payload_len;
+		frame->data[frame->data_length] = '\0';
+	} else if( frame->opcode == CRB_WS_PING_FRAME  ) {
+		int i, j;
+		uint8_t ch;
+
+		printf("Payload: %i\n", frame->payload_len);
+
+		if ( frame->payload_len > 125 ) {
+			// Control frames are allowed payload up to 125 bytes
+			return CRB_ERROR_CRITICAL;
+		}
+		
+		for (i = 0; i < frame->payload_len; i += 1) {
+			j = i%4;
+			ch = (*(u_char*)(read_pos+i))^frame->mask.octets[j];
+			*(read_pos+i) = ch;
+		}
+		
+		frame->crb_type = CRB_WS_TYPE_DATA;
+		
+		frame->data = malloc(frame->payload_len + 1);
+		if ( frame->data == NULL ) {
+			crb_log_error("Cannot allocate memory for payload");
+			return CRB_ERROR_CRITICAL;
+		}
+
 		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
 		frame->data_length = frame->payload_len;
 		frame->data[frame->data_length] = '\0';

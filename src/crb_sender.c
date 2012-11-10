@@ -16,6 +16,7 @@
 #include "crb_ws.h"
 
 static void crb_sender_task_broadcast(crb_task_t *task);
+static void crb_sender_task_pong(crb_task_t *task);
 static void crb_sender_task_handshake(crb_task_t *task);
 
 crb_sender_t *
@@ -99,10 +100,14 @@ crb_sender_loop(void *data)
 				case CRB_TASK_BROADCAST:
 					crb_sender_task_broadcast(task);
 					break;
+				case CRB_TASK_PONG:
+					crb_sender_task_pong(task);
+					break;
 				case CRB_TASK_HANDSHAKE:
 					crb_sender_task_handshake(task);
 					break;
 				default: 
+					crb_log_error("Invalid task");
 					crb_task_free(task);
 					break;
 			}
@@ -204,6 +209,60 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	
 	free(header);
 	crb_hash_cursor_free(cursor);
+	crb_ws_frame_free_with_data(frame);
+	crb_task_free(task);
+}
+
+static void
+crb_sender_task_pong(crb_task_t *task) {
+	crb_client_t *client;
+	crb_ws_frame_t *frame;
+	
+	size_t data_offset, data_size;
+	int bytes_written;
+	
+	uint8_t *header;
+	int header_length;
+	
+	frame = task->data2;
+	client = task->client;
+	
+	data_offset = 0;
+	data_size = frame->data_length;
+
+	if ( client->state != CRB_STATE_OPEN ) {
+		crb_ws_frame_free_with_data(frame);
+		crb_task_free(task);
+		return;
+	}
+	
+	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0, CRB_WS_PONG_FRAME);
+	if ( header == NULL ) {
+		crb_log_error("Cannot create frame head");
+		
+		crb_ws_frame_free_with_data(frame);
+		crb_task_free(task);
+		return;
+	}
+	
+	bytes_written = write(client->sock_fd, (char*)header, header_length);
+	bytes_written = write(client->sock_fd, frame->data, data_size);
+
+	crb_log_info(" {write}");
+	
+	while (bytes_written > 0 && bytes_written < data_size) {
+		data_offset += bytes_written;
+		data_size -= bytes_written;
+		
+		crb_log_info(" {loop}");
+		do {
+			errno == 0;
+			bytes_written = write(client->sock_fd, frame->data + data_offset, data_size);
+			crb_log_info(" {write}");
+		} while (bytes_written == -1 && errno == 11);
+	}
+	
+	free(header);
 	crb_ws_frame_free_with_data(frame);
 	crb_task_free(task);
 }
