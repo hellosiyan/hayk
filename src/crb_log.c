@@ -23,18 +23,21 @@ crb_log_init()
 void
 crb_log_info(char *msg)
 {
+	printf("[INFO]  %s\n", msg);
 	dprintf(log_file, "[INFO]  %s\n", msg);
 }
 
 void
 crb_log_debug(char *msg)
 {
+	printf("[DEBUG] %s\n", msg);
 	dprintf(log_file, "[DEBUG] %s\n", msg);
 }
 
 void
 crb_log_error(char *msg)
 {
+	printf("[ERROR] %s\n", msg);
 	dprintf(log_file, "[ERROR] %s\n", msg);
 }
 

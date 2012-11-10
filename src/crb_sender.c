@@ -164,7 +164,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	data_offset = 0;
 	data_size = frame->data_length;
 	
-	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0);
+	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0, frame->opcode);
 	if ( header == NULL ) {
 		crb_log_error("Cannot create frame head");
 		
@@ -174,22 +174,29 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	}
 	
 	cursor = crb_hash_cursor_init(channel->clients);
+	printf("Start while\n");
 	while ( (client = crb_hash_cursor_next(cursor)) != NULL ) {
 		data_offset = 0;
 		data_size = frame->data_length;
+
+		printf("while iter\n");
 		
-		if ( client->state == CRB_STATE_OPEN && client->sock_fd != task->client->sock_fd ) {
+		if ( client->state == CRB_STATE_OPEN /*&& client->sock_fd != task->client->sock_fd*/ ) {
+			printf(" while iter DO\n");
 			bytes_written = write(client->sock_fd, (char*)header, header_length);
 			
 			bytes_written = write(client->sock_fd, frame->data, data_size);
+			crb_log_info(" {write}");
 			
 			while (bytes_written > 0 && bytes_written < data_size) {
 				data_offset += bytes_written;
 				data_size -= bytes_written;
 				
+					crb_log_info(" {loop}");
 				do {
 					errno == 0;
 					bytes_written = write(client->sock_fd, frame->data + data_offset, data_size);
+					crb_log_info(" {write}");
 				} while (bytes_written == -1 && errno == 11);
 			}
 		}

@@ -65,11 +65,10 @@ crb_ws_frame_create_from_data(char *data, uint64_t data_length, int masked)
 }
 
 uint8_t *
-crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked)
+crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked, uint8_t opcode)
 {
 	uint8_t *pos, *frame_data;
 	uint64_t payload_len;
-	uint8_t opcode;
 	int is_masked;
 	union {
 		uint32_t raw;
@@ -82,7 +81,6 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	
 	// define frame properties 
 	payload_len = data_length;
-	opcode = CRB_WS_TEXT_FRAME;
 	
 	if ( masked ) {
 		is_masked = 1;
@@ -96,7 +94,7 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	
 	if ( payload_len < 126 ) {
 		// pass
-	} else if (payload_len <= 65536 ) {
+	} else if (payload_len < 65536 ) {
 		*length += 2;
 	} else {
 		*length += 8;
@@ -120,15 +118,19 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	// Payload length
 	if ( payload_len < 126 ) {
 		*pos = (payload_len&127) | (is_masked << 7);
-	} else if (payload_len <= 65536 ) {
+	} else if (payload_len < 65536 ) {
 		*pos = 126 | (is_masked << 7);
 		pos += 1;
-		*(uint16_t*)pos = payload_len;
+		*(uint16_t*)pos = htons(payload_len);
 		pos += 2;
 	} else {
 		*pos = 127 | (is_masked << 7);
 		pos += 1;
-		*((uint64_t*)pos) = (uint64_t)payload_len;
+
+		*((uint64_t*)pos) = ntohl((uint32_t)payload_len);
+		*((uint64_t*)pos) <<= 32;
+		*((uint64_t*)pos) += ntohl( * (((uint32_t *) (&payload_len))+1) );
+
 		pos += 8;
 	}
 	
@@ -203,12 +205,14 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	char *read_pos;
 	
 	if ( frame == NULL || buffer == NULL ) {
+		printf(" incomplete 1\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
 	read_pos = buffer->rpos;
 	
 	if ( buffer->used < 2 ) {
+		printf(" incomplete 2\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
@@ -223,6 +227,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		case CRB_WS_PING_FRAME: frame->opcode = CRB_WS_PING_FRAME; break;
 		case CRB_WS_PONG_FRAME: frame->opcode = CRB_WS_PONG_FRAME; break;
 		default:
+			printf(" invalid 1\n");
 			return CRB_ERROR_INVALID_OPCODE;
 	}
 	
@@ -240,12 +245,14 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		// 16bit length
 		// require the next 2 bytes
 		if ( buffer->used < 4 ) {
+			printf(" incomplete 3\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
 		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
 		
 		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
+			printf(" incomplete 4\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -254,6 +261,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		// 64bit length
 		// require the next 8 bytes
 		if ( buffer->used < 10 ) {
+			printf(" incomplete 5\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
@@ -262,13 +270,15 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
 		
 		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
+			printf(" incomplete 6\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 		
-		read_pos = read_pos + 8; 
+		read_pos = read_pos + 10; 
 	} else {
 		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			return CRB_PARSE_INCOMPLETE;
+			printf(" incomplete 7\n");
+			// return CRB_PARSE_INCOMPLETE;
 		}
 		read_pos = read_pos + 2; 
 	}
@@ -276,6 +286,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	// Masking key
 	if ( frame->is_masked ) {
 		if ( buffer->used < (read_pos + 4) - buffer->ptr ) {
+			printf(" incomplete 8\n");
 			return CRB_PARSE_INCOMPLETE;
 		}
 	
@@ -285,13 +296,16 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	
 	// Payload
 	if ( buffer->used < (read_pos + frame->payload_len) - buffer->ptr ) {
+			printf(" incomplete 9\n");
 		return CRB_PARSE_INCOMPLETE;
 	}
 	
 	// Payload / Unmask 
-	if( frame->opcode == CRB_WS_TEXT_FRAME ) {
+	if( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME  ) {
 		int i, j;
 		uint8_t ch;
+
+		printf("Payload: %i\n", frame->payload_len);
 		
 		for (i = 0; i < frame->payload_len; i += 1) {
 			j = i%4;
@@ -301,7 +315,9 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		
 		// detect message type (data or control)
 		// remove the first 4 characters for the type id from the plain message
-		if ( crb_strcmp3(read_pos, 'D', 'A', 'T') ) {
+		if ( 1 ) {
+			frame->crb_type = CRB_WS_TYPE_DATA;
+		} else if ( crb_strcmp3(read_pos, 'D', 'A', 'T') ) {
 			frame->crb_type = CRB_WS_TYPE_DATA;
 			read_pos += 4;
 			frame->payload_len -= 4;

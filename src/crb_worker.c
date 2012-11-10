@@ -170,11 +170,13 @@ crb_worker_run(crb_worker_t * worker)
 		flags |= O_NONBLOCK;
 		result = fcntl (new_desc, F_SETFL, flags);
 		if (result == -1) {
+			perror ("fcntl");
 			close(new_desc);
 			continue;
 		}
 
 		{
+			printf("add client\n");
 			crb_client_t *client;
 			client = crb_client_init();
 			client->sock_fd = new_desc;
@@ -182,7 +184,7 @@ crb_worker_run(crb_worker_t * worker)
 			crb_worker_on_client_connect(client);
 		}
 	}
-	
+	printf("exiting .. \n");
  	_crb_worker_stop();
 
 	exit(0);
@@ -296,6 +298,10 @@ crb_worker_on_client_connect(crb_client_t *client)
 {
 	client->state = CRB_STATE_CONNECTING;
 	crb_reader_add_client(worker_inst->active_reader, client);
+	
+	/* TODO: remove; begin test code */
+	crb_channel_subscribe(crb_worker_register_channel("test"), client);
+	/* end test code */
 }
 
 void

@@ -87,7 +87,7 @@ crb_reader_loop(void *data)
 		crb_log_error("Cannot allocate epoll events array");
 		return 0;
 	}
-	
+
 	reader->running = 1;
 	while(reader->running) {
 		n = epoll_wait (reader->epoll_fd, events, CRB_READER_EPOLL_MAX_EVENTS, 250);
@@ -225,6 +225,8 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 	
 	frame = NULL;
 	
+	printf("data state: %i (%i, %i)\n", client->data_state, CRB_DATA_STATE_HANDSHAKE, CRB_DATA_STATE_FRAME_BEGIN);
+
 	switch(client->data_state) {
 		case CRB_DATA_STATE_HANDSHAKE:
 			result = crb_reader_parse_request(client);
@@ -262,6 +264,8 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			frame = crb_ws_frame_init();
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
 			
+			printf("Parse result: %i (%i, %i, %i, %i)\n", result, CRB_PARSE_INCOMPLETE, CRB_ERROR_INVALID_OPCODE, CRB_PARSE_DONE, CRB_ERROR_CRITICAL);
+
 			if ( result == CRB_PARSE_INCOMPLETE ) {
 				// Wait for more data
 				crb_ws_frame_free_with_data(frame);
@@ -277,9 +281,12 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				}
 				
 				crb_buffer_trim_left(client->buffer_in);
+
+				printf(" opcode: %i (%i, %i)\n", frame->opcode, CRB_WS_TEXT_FRAME, CRB_WS_CLOSE_FRAME);
 				
 				// take action based on frame type
-				if ( frame->opcode == CRB_WS_TEXT_FRAME ) {
+				if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
+					printf("  type: %i (%i, %i, %i)\n", frame->crb_type, CRB_WS_TYPE_DATA, CRB_WS_BIN_FRAME, CRB_WS_TYPE_CONTROL);
 					if ( frame->crb_type == CRB_WS_TYPE_DATA ) {
 						crb_reader_handle_data_frame(reader, client, frame);
 					} else if ( frame->crb_type == CRB_WS_TYPE_CONTROL ) {
@@ -605,8 +612,13 @@ crb_reader_validate_request(crb_client_t *client)
 	}
 	
 	header = crb_request_get_header(request, CRB_WS_VERSION, -1);
-	if ( header == NULL || header->value == NULL || !(crb_strcmp2(header->value, '1', '3')) ) {
-		crb_log_debug("Invalid or missing Sec-WebSocket-Version header");
+	
+	if ( header == NULL || header->value == NULL ) {
+		crb_log_debug("Missing Sec-WebSocket-Version header");
+		return CRB_ERROR_INVALID_REQUEST;
+	} else if ( !(crb_strcmp2(header->value, '1', '3')) ) {
+		printf("version: %s\n", header->value);
+		crb_log_debug("Invalid Sec-WebSocket-Version header");
 		return CRB_ERROR_INVALID_REQUEST;
 	}
 	
@@ -640,7 +652,7 @@ crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_
 	crb_channel_t *channel;
 	
 	channel = crb_reader_parse_data_frame(frame);
-	if ( channel == NULL ) {
+	/*if ( channel == NULL ) {
 		// unknown channel name
 		crb_ws_frame_free_with_data(frame);
 		return;
@@ -649,7 +661,9 @@ crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_
 		crb_log_debug("Not subscribed");
 		crb_ws_frame_free_with_data(frame);
 		return;
-	}
+	}*/
+	
+	// crb_log_info(frame->data);
 	
 	task = crb_task_init();
 	crb_task_set_client(task, client);
@@ -667,6 +681,7 @@ crb_reader_parse_data_frame(crb_ws_frame_t *frame)
 	char c, ch, *last;
 	char *channel_name;
 	size_t channel_name_length;
+	return crb_worker_register_channel("test");
 	
     enum {
         sw_start = 0,		// 1

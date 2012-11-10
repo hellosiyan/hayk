@@ -74,6 +74,7 @@ crb_client_unref(crb_client_t *client)
 void 
 crb_client_close(crb_client_t *client) 
 {
+	printf("client closed\n");
 	if ( client == NULL || client->state == CRB_STATE_CLOSED || client->state == CRB_STATE_CLOSING ) {
 		return;
 	}
