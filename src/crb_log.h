@@ -6,8 +6,7 @@
 
 #include "crb_worker.h"
 
-// #define CRB_LOGFILE PACKAGE_DATA_DIR "/caribou.log"
-#define CRB_LOGFILE "/home/siyan/caribou.log"
+#define CRB_LOGFILE PACKAGE_DATA_DIR "/caribou.log"
 
 int crb_log_init();
 void crb_log_info(char *msg);
