@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 
 #include "crb_atomic.h"
+#include "crb_ws.h"
 #include "crb_client.h"
 
 #define CRB_READER_BUFFER_SIZE 4096
@@ -72,16 +73,36 @@ crb_client_unref(crb_client_t *client)
 }
 
 void 
-crb_client_close(crb_client_t *client) 
+crb_client_mark_as_closing(crb_client_t *client) 
 {
-	printf("client closed\n");
 	if ( client == NULL || client->state == CRB_STATE_CLOSED || client->state == CRB_STATE_CLOSING ) {
 		return;
 	}
 	
 	client->state = CRB_STATE_CLOSING;
+}
+
+void 
+crb_client_close(crb_client_t *client) 
+{
+	uint8_t *close_frame;
+	int close_frame_length;
+
+	if ( client == NULL || client->state == CRB_STATE_CLOSED ) {
+		return;
+	}
+	
+	client->state = CRB_STATE_CLOSING;
+
+	close_frame = crb_ws_frame_close(&close_frame_length, 0);
+
+	write(client->sock_fd, (char*)close_frame, close_frame_length);
 	close(client->sock_fd);
+
 	client->state = CRB_STATE_CLOSED;
+
+	free(close_frame);
+	crb_log_info("Closed client");
 }
 
 

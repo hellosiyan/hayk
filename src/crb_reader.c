@@ -182,20 +182,8 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	}
 	
 	crb_hash_remove(reader->clients, &(client->id), sizeof(int));
-		
-	if ( client->state == CRB_STATE_OPEN ) {
-		uint8_t *close_frame;
-		int close_frame_length;
-		
-		client->state == CRB_STATE_CLOSING;
-	
-		close_frame = crb_ws_frame_close(&close_frame_length, 0);
-		
-		write(client->sock_fd, (char*)close_frame, close_frame_length);
-		free(close_frame);
-	} else {
-		client->state == CRB_STATE_CLOSING;
-	}
+
+	crb_client_mark_as_closing(client);
 	
 	crb_atomic_fetch_sub( &(reader->client_count), 1 );
 	crb_client_unref(client);

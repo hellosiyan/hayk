@@ -39,5 +39,6 @@ void crb_client_unref(crb_client_t *client);
 
 void crb_client_set_request(crb_client_t *client, crb_request_t *request);
 void crb_client_close(crb_client_t *client);
+void crb_client_mark_as_closing(crb_client_t *client);
 
 #endif /* __CRB_CLIENT_H__ */
