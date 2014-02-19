@@ -230,6 +230,9 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 
 	// RSV bits
 	frame->rsv = (raw&112)>>4;
+
+	// Fin
+	frame->is_fin = (raw&128)>>7;
 	
 	// Mask
 	if ( raw & 256 == 0 ) {

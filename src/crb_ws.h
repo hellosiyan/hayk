@@ -41,6 +41,7 @@ struct crb_ws_frame_s {
 	uint64_t data_length;
 	
 	unsigned is_masked:1;
+	unsigned is_fin:1;
 };
 
 crb_ws_frame_t *crb_ws_frame_init();
