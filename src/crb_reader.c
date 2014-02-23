@@ -315,7 +315,7 @@ crb_reader_parse_request(crb_client_t *client)
 	char c, ch, *p, *last;
 	char *left, *right, *header_name;
 	crb_request_t *request;
-	int is_cr, is_crlf, trailing_ws = 0;
+	int is_crlf = 0, trailing_ws = 0;
 	size_t header_name_length;
 	
 	if ( client->request == NULL ) {
