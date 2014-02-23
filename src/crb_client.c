@@ -31,6 +31,14 @@ crb_client_init()
     	free(client);
     	return NULL;
     }
+
+	client->fragmented_frame = NULL;
+	client->fragmented_data = crb_buffer_init(CRB_READER_BUFFER_SIZE);
+	if ( client->fragmented_data == NULL ) {
+    	crb_log_error("Cannot allocate fragment data buffer");
+    	free(client);
+    	return NULL;
+    }	
     
     client->id = 0;
     
@@ -54,6 +62,38 @@ crb_client_set_request(crb_client_t *client, crb_request_t *request)
 		crb_request_ref(request);
 	}
 	client->request = request;
+}
+
+void 
+crb_client_add_fragment(crb_client_t *client, crb_ws_frame_t *frame)
+{
+	if ( client->fragmented_frame == NULL ) {
+		client->fragmented_frame = crb_ws_frame_init();
+
+		*(client->fragmented_frame) = *frame;
+		client->fragmented_frame->data = NULL;
+		client->fragmented_frame->data_length = 0;
+	}
+
+	crb_buffer_append_string(client->fragmented_data, frame->data, frame->data_length);
+}
+
+crb_ws_frame_t *
+crb_client_get_fragments_as_frame(crb_client_t *client)
+{
+	crb_ws_frame_t *frame;
+
+	frame = crb_ws_frame_init();
+	*frame = *(client->fragmented_frame);
+	frame->data = crb_buffer_copy_string_without_sentinel(client->fragmented_data, &(frame->data_length));
+
+	// free client fragmented data
+	crb_ws_frame_free_with_data(client->fragmented_frame);
+	client->fragmented_frame = NULL;
+
+	crb_buffer_clear(client->fragmented_data);
+
+	return frame;
 }
 
 inline void 
@@ -122,6 +162,14 @@ crb_client_free(crb_client_t *client)
 		crb_request_free(client->request);
 		client->request = NULL;
 	}
+
+	if ( client->fragmented_frame != NULL ) {
+		crb_ws_frame_free_with_data(client->fragmented_frame);
+		client->fragmented_frame = NULL;
+	}
+
+	crb_buffer_free(client->fragmented_data);
+	client->fragmented_data = NULL;
 	
 	free(client);
 }

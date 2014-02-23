@@ -176,7 +176,7 @@ crb_reader_drop_client(crb_reader_t *reader, crb_client_t *client)
 	crb_worker_on_client_disconnect(client);
 	int result;
 	
-	epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
+	result = epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
 	if ( result == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
 		crb_log_error("Cannot add client to epoll - not enough memory");
 	}
@@ -241,13 +241,14 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				crb_task_set_type(task, CRB_TASK_HANDSHAKE);
 				
 				client->state = CRB_STATE_OPEN;
-				client->data_state = CRB_DATA_STATE_FRAME_BEGIN;
+				client->data_state = CRB_DATA_STATE_FRAME;
 				crb_buffer_clear(client->buffer_in);
 				
 				crb_worker_queue_task(task);
 			}
 			break;
-		case CRB_DATA_STATE_FRAME_BEGIN:
+		case CRB_DATA_STATE_FRAME:
+		case CRB_DATA_STATE_FRAME_FRAGMENT:
 			parse_frame_from_buffer:
 			frame = crb_ws_frame_init();
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
@@ -264,7 +265,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 				crb_ws_frame_free_with_data(frame);
 				crb_reader_drop_client(reader, client);
 			} else if ( result == CRB_PARSE_DONE ) {
-				// Valid frame
+				// Valid frame structure
 				if( frame->is_masked == 0 ) {
 					crb_log_error("Received non-masked frame from client");
 					crb_ws_frame_free_with_data(frame);
@@ -274,27 +275,55 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 					crb_ws_frame_free_with_data(frame);
 					crb_reader_drop_client(reader, client);
 					break;
-				}
-
-				crb_buffer_trim_left(client->buffer_in);
-
-				// take action based on frame type
-				if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
-					if ( frame->crb_type == CRB_WS_TYPE_DATA ) {
-						crb_reader_handle_data_frame(reader, client, frame);
-					} else if ( frame->crb_type == CRB_WS_TYPE_CONTROL ) {
-						crb_reader_handle_control_frame(reader, client, frame);
-					}
-				} else if ( frame->opcode == CRB_WS_PING_FRAME ) {
-					crb_reader_handle_ping_frame(reader, client, frame);
-				} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
-					// Close frame - end the connection
+				} else if ( (frame->opcode & CRB_WS_IS_CONTROL_FRAME) != 0 && !frame->is_fin ) {
+					crb_log_error("Received fragmented control frame");
 					crb_ws_frame_free_with_data(frame);
 					crb_reader_drop_client(reader, client);
 					break;
-				} else {
-					// Unsupported frame type
+				} else if ( frame->opcode == CRB_WS_CONT_FRAME && client->data_state == CRB_DATA_STATE_FRAME ) {
+					crb_log_error("No message to continue");
 					crb_ws_frame_free_with_data(frame);
+					crb_reader_drop_client(reader, client);
+					break;
+				} else if ( client->data_state == CRB_DATA_STATE_FRAME_FRAGMENT && (frame->opcode != CRB_WS_CONT_FRAME && (frame->opcode & CRB_WS_IS_CONTROL_FRAME) == 0) ) {
+					crb_log_error("Data frame injected in fragmanted message");
+					crb_ws_frame_free_with_data(frame);
+					crb_reader_drop_client(reader, client);
+					break;
+				}
+
+				if ( !frame->is_fin ) {
+					// Handle fragmentation
+					client->data_state = CRB_DATA_STATE_FRAME_FRAGMENT;
+					crb_client_add_fragment(client, frame);
+					crb_ws_frame_free_with_data(frame);
+				} else {
+					// Replace last continuation frame with the original fragmented frame header
+					if ( frame->opcode == CRB_WS_CONT_FRAME ) {
+						crb_client_add_fragment(client, frame);
+						crb_ws_frame_free_with_data(frame);
+
+						frame = crb_client_get_fragments_as_frame(client);
+					}
+
+					// take action based on frame type
+					if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
+						if ( frame->crb_type == CRB_WS_TYPE_DATA ) {
+							crb_reader_handle_data_frame(reader, client, frame);
+						} else if ( frame->crb_type == CRB_WS_TYPE_CONTROL ) {
+							crb_reader_handle_control_frame(reader, client, frame);
+						}
+					} else if ( frame->opcode == CRB_WS_PING_FRAME ) {
+						crb_reader_handle_ping_frame(reader, client, frame);
+					} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
+						// Close frame - end the connection
+						crb_ws_frame_free_with_data(frame);
+						crb_reader_drop_client(reader, client);
+						break;
+					} else {
+						// Unsupported frame type
+						crb_ws_frame_free_with_data(frame);
+					}
 				}
 
 				goto parse_frame_from_buffer;

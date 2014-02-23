@@ -201,8 +201,8 @@ crb_ws_frame_close(int *length, int masked)
 int 
 crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 {
-	uint16_t raw;
-	char *read_pos;
+	uint16_t raw = 0;
+	char *read_pos = NULL;
 	
 	if ( frame == NULL || buffer == NULL ) {
 		return CRB_PARSE_INCOMPLETE;
@@ -298,7 +298,7 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 	}
 	
 	// Payload / Unmask 
-	if( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME  ) {
+	if( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME || frame->opcode == CRB_WS_CONT_FRAME  ) {
 		int i, j;
 		uint8_t ch;
 

@@ -74,6 +74,29 @@ crb_buffer_copy_string(crb_buffer_t *buffer)
 	return string;
 }
 
+char *
+crb_buffer_copy_string_without_sentinel(crb_buffer_t *buffer, size_t *size)
+{
+	char *string;
+
+	if ( buffer->used < 1 ) {
+		return NULL;
+	}
+	
+	string = malloc(buffer->used-1);
+	if ( string == NULL ) {
+		return NULL;
+	}
+	
+	string = memcpy(string, buffer->ptr, buffer->used-1);
+
+	if ( size != NULL ) {
+		*size = buffer->used-1;
+	}
+	
+	return string;
+}
+
 
 int 
 crb_buffer_append_string(crb_buffer_t *buffer, const char *str, size_t str_len)
