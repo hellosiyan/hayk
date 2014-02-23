@@ -67,7 +67,6 @@ crb_server_init()
 		crb_worker_t *worker;
 	
 		worker = crb_worker_create(server->config->defaults);
-	
 		crb_list_push(server->workers, worker);
 	}
 	
@@ -83,7 +82,6 @@ crb_server_init()
 			crb_worker_t *worker;
 	
 			worker = crb_worker_create(virt_config);
-	
 			crb_list_push(server->workers, worker);
 			
 			item = item->next;
@@ -105,7 +103,7 @@ crb_server_start(crb_server_t *server)
 	}
 	
 	/* Deamonize */
-	// daemon(0, 1);
+	daemon(0, 1);
 	crb_write_pid();
 	
 	/* Loop */
@@ -119,13 +117,37 @@ crb_server_start(crb_server_t *server)
 	
 			while ( item != NULL ) {
 				worker = (crb_worker_t*) item->data;
-				worker->pid = crb_worker_run(worker);
+				worker->pid = crb_worker_fork_and_run(worker);
 				item = item->next;
 			}
 		}
 		
 		pause();
 	} while ( server->restart );
+	
+	crb_clear_pid();
+}
+
+
+void
+crb_server_start_single_proc(crb_server_t *server)
+{
+	if ( server == NULL ) {
+		return;
+	}
+	
+	crb_write_pid();
+	
+	// start worker
+	{
+		crb_worker_t *worker;
+		crb_list_item_t *item;
+
+		item = server->workers->first;
+
+		worker = (crb_worker_t*) item->data;
+		crb_worker_run(worker);
+	}
 	
 	crb_clear_pid();
 }
@@ -269,7 +291,6 @@ void
 crb_clear_pid()
 {
 	int pid_file;
-	
 	pid_file = open(CRB_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
 	if ( pid_file < 0 ) {
 		return;

@@ -66,6 +66,7 @@ crb_worker_create(crb_config_entry_t *config)
 	
 	worker->pid = 0;
 	worker->socket_in = 0;
+	worker->is_forked = 0;
 	
 	return worker;
 }
@@ -77,19 +78,39 @@ crb_worker_get()
 }
 
 int 
-crb_worker_run(crb_worker_t * worker)
+crb_worker_fork_and_run(crb_worker_t * worker)
 {
 	pid_t pid;
+
+	if ( worker->state != CRB_WORKER_STOPPED ) {
+		crb_log_error("Cannot run, worker already running");
+		return 0;
+	}
+
 	pid = fork();
+	worker->is_forked = 1;
 	
 	if ( pid != 0 ) {
 		return pid;
 	}
 	
-	worker_inst = worker;
 	worker->pid = pid;
 	
 	crb_worker_signals_init();
+
+	crb_worker_run(worker);
+}
+
+int 
+crb_worker_run(crb_worker_t * worker)
+{
+	worker_inst = worker;
+
+	if ( worker->state != CRB_WORKER_STOPPED ) {
+		crb_log_error("Cannot run, worker already running");
+		return 0;
+	}
+
 	crb_worker_reader_pool_init();
 	crb_worker_sender_pool_init();
 	
@@ -176,7 +197,7 @@ crb_worker_run(crb_worker_t * worker)
 		}
 
 		{
-			printf("add client\n");
+			crb_log_info("Add client");
 			crb_client_t *client;
 			client = crb_client_init();
 			client->sock_fd = new_desc;
@@ -184,16 +205,19 @@ crb_worker_run(crb_worker_t * worker)
 			crb_worker_on_client_connect(client);
 		}
 	}
+
 	printf("exiting .. \n");
  	_crb_worker_stop();
 
-	exit(0);
+ 	if ( worker->is_forked ) {
+ 		exit(0);
+ 	}
 }
 
 int 
 crb_worker_stop(crb_worker_t * worker)
 {
-	if ( worker != NULL && worker->pid != 0 ) {
+	if ( worker != NULL && worker->is_forked && worker->pid != 0 ) {
 		kill(worker->pid, SIGINT);
 		waitpid(worker->pid, NULL, 0);
 		return;
@@ -323,7 +347,6 @@ crb_worker_on_client_disconnect(crb_client_t *client)
 
 	crb_hash_cursor_free(cursor);
 }
-
 
 static void 
 crb_worker_signals_init()

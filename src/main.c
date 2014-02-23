@@ -25,7 +25,7 @@ main(int argc, char **argv)
 	command = crb_parse_command_arg(argv[1]);
 	server_pid = crb_read_pid();
 	
-	if ( command == CRB_SERVER_START ) {
+	if ( command == CRB_SERVER_START || command == CRB_SERVER_START_DEBUG ) {
 		if ( server_pid > 0 ) {
 			printf("Server is already running.\n");
 			return EXIT_FAILURE;
@@ -38,7 +38,11 @@ main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 		
-		crb_server_start(server);
+		if ( command == CRB_SERVER_START ) {
+			crb_server_start(server);
+		} else {
+			crb_server_start_single_proc(server);
+		}
 	} else if ( command == CRB_SERVER_STOP ) {
 		if ( server_pid == 0 ) {
 			printf("Server is not running.\n");
@@ -87,6 +91,8 @@ crb_parse_command_arg(char *command)
 	
 	if ( strcmp(command, "start") == 0 ) {
 		return CRB_SERVER_START;
+	} else if ( strcmp(command, "debug") == 0 ) {
+		return CRB_SERVER_START_DEBUG;
 	} else if ( strcmp(command, "stop") == 0 ) {
 		return CRB_SERVER_STOP;
 	} else if ( strcmp(command, "restart") == 0 ) {

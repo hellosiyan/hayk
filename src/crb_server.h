@@ -19,6 +19,7 @@
 
 typedef enum {
      CRB_SERVER_START = 0,
+     CRB_SERVER_START_DEBUG,
      CRB_SERVER_STOP,
      CRB_SERVER_RESTART
 } crb_server_command_e;
@@ -32,6 +33,7 @@ struct crb_server_s {
 
 crb_server_t *crb_server_init();
 void crb_server_start(crb_server_t *server);
+void crb_server_start_single_proc(crb_server_t *server);
 void crb_server_restart(crb_server_t *server);
 void crb_server_stop(crb_server_t *server);
 

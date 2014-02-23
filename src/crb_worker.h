@@ -30,10 +30,13 @@ struct crb_worker_s {
 	crb_sender_t *active_sender;
 	
 	crb_config_entry_t *config;
+
+	unsigned is_forked:1;
 };
 
 
 crb_worker_t * crb_worker_create(crb_config_entry_t *config);
+int crb_worker_fork_and_run(crb_worker_t * worker);
 int crb_worker_run(crb_worker_t * worker);
 int crb_worker_stop(crb_worker_t * worker);
 void crb_worker_queue_task();
