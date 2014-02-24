@@ -251,6 +251,9 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 		case CRB_DATA_STATE_FRAME_FRAGMENT:
 			parse_frame_from_buffer:
 			frame = crb_ws_frame_init();
+			if ( client->data_state == CRB_DATA_STATE_FRAME_FRAGMENT ) {
+				frame->utf8_state = client->fragmented_data_utf8_state;
+			}
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
 			
 			if ( result == CRB_PARSE_INCOMPLETE ) {

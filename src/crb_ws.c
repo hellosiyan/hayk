@@ -35,6 +35,7 @@ crb_ws_frame_init()
 	
 	frame->data = NULL;
 	frame->data_length = 0;
+	frame->utf8_state = CRB_UTF8_NONE;
 	
 	return frame;
 }
@@ -74,11 +75,7 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 		uint32_t raw;
 		uint8_t octets[4];
 	} mask;
-	
-	if ( data == NULL ) {
-		return NULL;
-	}
-	
+		
 	// define frame properties 
 	payload_len = data_length;
 	
@@ -302,11 +299,85 @@ crb_ws_frame_parse_buffer(crb_ws_frame_t *frame, crb_buffer_t *buffer)
 		int i, j;
 		uint8_t ch;
 
+		crb_utf8_state_e expect;
+
+		switch(frame->opcode) {
+			case CRB_WS_TEXT_FRAME: expect = CRB_UTF8_CHAR; break;
+			case CRB_WS_BIN_FRAME: expect = CRB_UTF8_NONE; break;
+			case CRB_WS_CONT_FRAME: expect = frame->utf8_state; break;
+		}
+
 		for (i = 0; i < frame->payload_len; i += 1) {
 			j = i%4;
 			ch = (*(u_char*)(read_pos+i))^frame->mask.octets[j];
 			*(read_pos+i) = ch;
+
+			frame->utf8_state = expect;
+
+			/* none */
+			if ( expect == CRB_UTF8_NONE ) {
+				// continue;
+
+			/* utf8 code */
+			} else if ( expect == CRB_UTF8_CHAR ) {
+				/* utf8 1 */
+				if ( ch <= 0x7F ) { // ascii
+					expect = CRB_UTF8_CHAR;
+				/* utf8 2 */
+				} else if ( (ch >= 0xC2 && ch <= 0xDF) ) {
+					expect = CRB_UTF8_TAIL;
+				/* utf 3 */
+				} else if ( ch == 0xE0 ) {
+					expect = CRB_UTF8_3_1;
+				} else if ( (ch >= 0xE1 && ch <= 0xEC) ) {
+					expect = CRB_UTF8_TAIL2;
+				} else if ( ch == 0xED ) {
+					expect = CRB_UTF8_3_3;
+				} else if ( (ch >= 0xEE && ch <= 0xEF) ) {
+					expect = CRB_UTF8_TAIL2;
+				/* utf 4 */
+				} else if ( ch == 0xF0 ) {
+					expect = CRB_UTF8_4_1;
+				} else if ( (ch >= 0xF1 && ch <= 0xF3) ) {
+					expect = CRB_UTF8_TAIL3;
+				} else if ( ch == 0xF4 ) {
+					expect = CRB_UTF8_4_3;
+				} else {
+					crb_log_error("Invalid UTF-8 sequence");
+					return CRB_ERROR_CRITICAL;
+				}
+				
+			/* utf8 3 */
+			} else if ( expect == CRB_UTF8_3_1 && (ch >= 0xA0 && ch <= 0xBF) ) {
+				expect = CRB_UTF8_TAIL;
+			} else if ( expect == CRB_UTF8_3_3 && (ch >= 0x80 && ch <= 0x9F) ) {
+				expect = CRB_UTF8_TAIL;
+
+			/* utf8 4 */
+			} else if ( expect == CRB_UTF8_4_1 && (ch >= 0x90 && ch <= 0xBF) ) {
+				expect = CRB_UTF8_TAIL2;
+			} else if ( expect == CRB_UTF8_4_3 && (ch >= 0x80 && ch <= 0x8F) ) {
+				expect = CRB_UTF8_TAIL2;
+			
+			/* utf8 tail */
+			} else if ( expect == CRB_UTF8_TAIL && (ch >= 0x80 && ch <= 0xBF) ) {
+				expect = CRB_UTF8_CHAR;
+			} else if ( expect == CRB_UTF8_TAIL2 && (ch >= 0x80 && ch <= 0xBF) ) {
+				expect = CRB_UTF8_TAIL;
+			} else if ( expect == CRB_UTF8_TAIL3 && (ch >= 0x80 && ch <= 0xBF) ) {
+				expect = CRB_UTF8_TAIL2;
+			} else {
+				crb_log_error("Invalid UTF-8 sequence");
+				return CRB_ERROR_CRITICAL;
+			}
 		}
+
+		if ( frame->is_fin && expect != CRB_UTF8_CHAR && expect != CRB_UTF8_NONE ) {
+			crb_log_error("Invalid UTF-8 sequence");
+			return CRB_ERROR_CRITICAL;
+		}
+
+		frame->utf8_state = expect;
 		
 		// detect message type (data or control)
 		// remove the first 4 characters for the type id from the plain message

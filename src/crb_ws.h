@@ -28,6 +28,20 @@
 #define CRB_WS_TYPE_DATA	0
 #define CRB_WS_TYPE_CONTROL	1
 
+typedef enum {
+	CRB_UTF8_NONE,
+	CRB_UTF8_CHAR,
+	CRB_UTF8_1,
+	CRB_UTF8_2,
+	CRB_UTF8_3_1,
+	CRB_UTF8_3_3,
+	CRB_UTF8_4_1,
+	CRB_UTF8_4_3,
+	CRB_UTF8_TAIL,
+	CRB_UTF8_TAIL2,
+	CRB_UTF8_TAIL3,
+} crb_utf8_state_e;
+
 typedef struct crb_ws_frame_s crb_ws_frame_t;
 struct crb_ws_frame_s {
 	uint8_t rsv;
@@ -40,6 +54,7 @@ struct crb_ws_frame_s {
 	} mask;
 	char *data;
 	uint64_t data_length;
+	crb_utf8_state_e utf8_state;
 	
 	unsigned is_masked:1;
 	unsigned is_fin:1;

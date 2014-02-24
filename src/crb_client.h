@@ -32,6 +32,7 @@ struct crb_client_s {
 
 	crb_ws_frame_t *fragmented_frame;
 	crb_buffer_t *fragmented_data;
+	crb_utf8_state_e fragmented_data_utf8_state;
 	
 	uint32_t ref;
 };
