@@ -11,6 +11,7 @@
 
 #define CRB_PARSE_DONE					1
 #define CRB_VALIDATE_DONE				1
+#define CRB_UNMASK_DONE					1
 #define CRB_PARSE_INCOMPLETE			10
 #define CRB_ERROR_INVALID_METHOD		11
 #define CRB_ERROR_INVALID_REQUEST		12
@@ -31,15 +32,13 @@
 typedef enum {
 	CRB_UTF8_NONE,
 	CRB_UTF8_CHAR,
-	CRB_UTF8_1,
-	CRB_UTF8_2,
-	CRB_UTF8_3_1,
-	CRB_UTF8_3_3,
-	CRB_UTF8_4_1,
-	CRB_UTF8_4_3,
+	CRB_UTF8_3_OCTETS_1,
+	CRB_UTF8_3_OCTETS_2,
+	CRB_UTF8_4_OCTETS_1,
+	CRB_UTF8_4_OCTETS_2,
 	CRB_UTF8_TAIL,
-	CRB_UTF8_TAIL2,
-	CRB_UTF8_TAIL3,
+	CRB_UTF8_TAIL_X2,
+	CRB_UTF8_TAIL_X3,
 } crb_utf8_state_e;
 
 typedef struct crb_ws_frame_s crb_ws_frame_t;

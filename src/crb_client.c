@@ -33,7 +33,6 @@ crb_client_init()
     }
 
 	client->fragmented_frame = NULL;
-	client->fragmented_data_utf8_state = CRB_UTF8_CHAR;
 	client->fragmented_data = crb_buffer_init(CRB_READER_BUFFER_SIZE);
 	if ( client->fragmented_data == NULL ) {
     	crb_log_error("Cannot allocate fragment data buffer");
@@ -76,7 +75,7 @@ crb_client_add_fragment(crb_client_t *client, crb_ws_frame_t *frame)
 		client->fragmented_frame->data_length = 0;
 	}
 
-	client->fragmented_data_utf8_state = frame->utf8_state;
+	client->fragmented_frame->utf8_state = frame->utf8_state;
 
 	crb_buffer_append_string(client->fragmented_data, frame->data, frame->data_length);
 }

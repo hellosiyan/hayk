@@ -252,7 +252,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 			parse_frame_from_buffer:
 			frame = crb_ws_frame_init();
 			if ( client->data_state == CRB_DATA_STATE_FRAME_FRAGMENT ) {
-				frame->utf8_state = client->fragmented_data_utf8_state;
+				frame->utf8_state = client->fragmented_frame->utf8_state;
 			}
 			result = crb_ws_frame_parse_buffer(frame, client->buffer_in);
 			
@@ -307,6 +307,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 						crb_ws_frame_free_with_data(frame);
 
 						frame = crb_client_get_fragments_as_frame(client);
+						client->data_state = CRB_DATA_STATE_FRAME;
 					}
 
 					// take action based on frame type
