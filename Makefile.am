@@ -1,1 +1,1 @@
-SUBDIRS = src tools conf
+SUBDIRS = src conf

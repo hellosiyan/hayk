@@ -29,6 +29,5 @@ AC_CHECK_FUNCS([inet_ntoa socket])
 
 AC_CONFIG_FILES([Makefile
 				 src/Makefile
-				 tools/Makefile
 				 conf/Makefile])
 AC_OUTPUT
