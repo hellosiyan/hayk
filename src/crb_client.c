@@ -48,7 +48,7 @@ crb_client_init()
 }
 
 void 
-crb_client_set_request(crb_client_t *client, crb_request_t *request)
+crb_client_set_handshake_request(crb_client_t *client, crb_http_request_t *request)
 {
 	if ( client == NULL ) {
 		return;
@@ -81,7 +81,7 @@ crb_client_add_fragment(crb_client_t *client, crb_ws_frame_t *frame)
 }
 
 crb_ws_frame_t *
-crb_client_get_fragments_as_frame(crb_client_t *client)
+crb_client_compile_fragments(crb_client_t *client)
 {
 	crb_ws_frame_t *frame;
 
@@ -136,7 +136,7 @@ crb_client_close(crb_client_t *client)
 	
 	client->state = CRB_STATE_CLOSING;
 
-	close_frame = crb_ws_frame_close(&close_frame_length, 0);
+	close_frame = crb_ws_generate_close_frame(&close_frame_length, 0);
 
 	write(client->sock_fd, (char*)close_frame, close_frame_length);
 	close(client->sock_fd);
@@ -161,7 +161,7 @@ crb_client_free(crb_client_t *client)
 	client->buffer_in = NULL;
 	
 	if ( client->request != NULL ) {		
-		crb_request_free(client->request);
+		crb_request_unref(client->request);
 		client->request = NULL;
 	}
 

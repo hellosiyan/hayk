@@ -31,8 +31,8 @@
         && s[4] == c4 && s[5] == c5 && s[6] == c6 && s[7] == c7
 
 static void crb_reader_on_data(crb_reader_t *reader, crb_client_t *client);
-static int crb_reader_parse_request(crb_client_t *client);
-static int crb_reader_validate_request(crb_client_t *client);
+static int crb_reader_parse_handshake_request(crb_http_request_t *request, crb_buffer_t *buffer);
+static int crb_reader_validate_handshake_request(crb_http_request_t *request);
 static int crb_reader_handle_data_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame);
 static int crb_reader_handle_ping_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame);
 static crb_channel_t * crb_reader_parse_data_frame(crb_ws_frame_t *frame);
@@ -211,23 +211,31 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 {
 	int result;
 	crb_ws_frame_t *frame;
+	crb_http_request_t *handshake_request;
 	
 	frame = NULL;
 	
 	switch(client->data_state) {
 		case CRB_DATA_STATE_HANDSHAKE:
-			result = crb_reader_parse_request(client);
+			handshake_request = client->request;
+
+			if ( handshake_request == NULL ) {
+				handshake_request = crb_request_init();
+				crb_client_set_handshake_request(client, handshake_request);
+			}
+
+			result = crb_reader_parse_handshake_request(handshake_request, client->buffer_in);
 			
 			if ( result == CRB_ERROR_INVALID_METHOD || result == CRB_ERROR_INVALID_REQUEST ) {
 				// Close client
 				crb_reader_drop_client(reader, client);
 			} else if ( result == CRB_PARSE_INCOMPLETE ) {
 				// Wait for more data, reset read position and free request
-				crb_client_set_request(client, NULL);
+				crb_client_set_handshake_request(client, NULL);
 				client->buffer_in->rpos = client->buffer_in->ptr;
 			} else if( result == CRB_PARSE_DONE ) {
 				// Validate handshake
-				result = crb_reader_validate_request(client);
+				result = crb_reader_validate_handshake_request(handshake_request);
 				if ( result != CRB_VALIDATE_DONE ) {
 					// Invalid WebSocket request
 					crb_reader_drop_client(reader, client);
@@ -306,7 +314,7 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 						crb_client_add_fragment(client, frame);
 						crb_ws_frame_free_with_data(frame);
 
-						frame = crb_client_get_fragments_as_frame(client);
+						frame = crb_client_compile_fragments(client);
 						client->data_state = CRB_DATA_STATE_FRAME;
 					}
 
@@ -342,21 +350,12 @@ crb_reader_on_data(crb_reader_t *reader, crb_client_t *client)
 }
 
 static int
-crb_reader_parse_request(crb_client_t *client)
+crb_reader_parse_handshake_request(crb_http_request_t *request, crb_buffer_t *buffer)
 {
-	crb_buffer_t *b;
 	char c, ch, *p, *last;
 	char *left, *right, *header_name;
-	crb_request_t *request;
 	int is_crlf = 0, trailing_ws = 0;
 	size_t header_name_length;
-	
-	if ( client->request == NULL ) {
-		request = crb_request_init();
-		crb_client_set_request(client, request);
-	} else {
-		request = client->request;
-	}
 	
     enum {
         sw_start = 0,
@@ -372,17 +371,15 @@ crb_reader_parse_request(crb_client_t *client)
         sw_header_value,			// 10
     } state;
     
-    b = client->buffer_in;
-    
     state = sw_start;
-    last = b->ptr + b->used;
+    last = buffer->ptr + buffer->used;
     
-    if ( b->rpos >= last ) {
+    if ( buffer->rpos >= last ) {
     	return CRB_PARSE_INCOMPLETE;
     }
     
-    for (; b->rpos < last; b->rpos++) {
-    	p = b->rpos;
+    for (; buffer->rpos < last; buffer->rpos++) {
+    	p = buffer->rpos;
     	ch = *p;
     	
     	switch(state) {
@@ -552,7 +549,7 @@ crb_reader_parse_request(crb_client_t *client)
 				        state = sw_header_separator;
 				        break;
 				    default:
-				    	*(b->rpos) = toupper(ch);
+				    	*(buffer->rpos) = toupper(ch);
     			}
     			break;
 		    case sw_header_separator:
@@ -623,13 +620,11 @@ crb_reader_parse_request(crb_client_t *client)
 }
 
 static int
-crb_reader_validate_request(crb_client_t *client)
+crb_reader_validate_handshake_request(crb_http_request_t *request)
 {
-	crb_request_t *request;
-	crb_header_t *header;
+	crb_http_header_t *header;
 	crb_worker_t *worker;
 	
-	request = client->request;
 	worker = crb_worker_get();
 	
 	header = crb_request_get_header(request, CRB_WS_KEY, -1);
@@ -781,12 +776,12 @@ static int
 crb_reader_handle_control_frame(crb_reader_t *reader, crb_client_t *client, crb_ws_frame_t *frame)
 {
 	crb_list_t *commands;
-	crb_header_t *command;
+	crb_http_header_t *command;
 	crb_channel_t *channel;
 	
 	commands = crb_reader_parse_control_frame(frame);
 	
-	command = (crb_header_t *) crb_list_pop(commands);
+	command = (crb_http_header_t *) crb_list_pop(commands);
 	while ( command != NULL ) {
 		if ( strcmp(command->name, "SUBSCRIBE") == 0 ) {
 			channel = crb_worker_register_channel( command->value );
@@ -798,7 +793,7 @@ crb_reader_handle_control_frame(crb_reader_t *reader, crb_client_t *client, crb_
 		
 		crb_header_free(command);
 		
-		command = (crb_header_t *) crb_list_pop(commands);
+		command = (crb_http_header_t *) crb_list_pop(commands);
 	}
 	
 	crb_list_free(commands);
@@ -814,7 +809,7 @@ crb_reader_parse_control_frame(crb_ws_frame_t *frame)
 	size_t header_name_length;
     
     crb_list_t *commands;
-    crb_header_t *tmp_header;
+    crb_http_header_t *tmp_header;
 	
     enum {
         sw_start = 0,				// 1

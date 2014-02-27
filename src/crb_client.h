@@ -28,7 +28,7 @@ struct crb_client_s {
 	uint64_t id;
 	
 	crb_buffer_t *buffer_in;
-	crb_request_t *request;
+	crb_http_request_t *request;
 
 	crb_ws_frame_t *fragmented_frame;
 	crb_buffer_t *fragmented_data;
@@ -41,9 +41,9 @@ void crb_client_ref(crb_client_t *client);
 void crb_client_unref(crb_client_t *client);
 
 void crb_client_add_fragment(crb_client_t *client, crb_ws_frame_t *frame);
-crb_ws_frame_t *crb_client_get_fragments_as_frame(crb_client_t *client);
+crb_ws_frame_t *crb_client_compile_fragments(crb_client_t *client);
 
-void crb_client_set_request(crb_client_t *client, crb_request_t *request);
+void crb_client_set_handshake_request(crb_client_t *client, crb_http_request_t *request);
 void crb_client_close(crb_client_t *client);
 void crb_client_mark_as_closing(crb_client_t *client);
 

@@ -43,33 +43,8 @@ crb_ws_frame_init()
 	return frame;
 }
 
-crb_ws_frame_t *
-crb_ws_frame_create_from_data(char *data, uint64_t data_length, int masked)
-{
-	crb_ws_frame_t *frame;
-	
-	if ( data == NULL || data_length <= 0 ) {
-		return NULL;
-	}
-	
-	frame = crb_ws_frame_init();
-	
-	frame->payload_len = data_length;
-	frame->opcode = CRB_WS_TEXT_FRAME;
-	frame->crb_type = CRB_WS_TYPE_DATA;
-	
-	if ( masked ) {
-		frame->is_masked = 1;
-		frame->mask.raw = rand();
-	} else {
-		frame->is_masked = 0;
-	}
-	
-	frame->data = data;
-}
-
 uint8_t *
-crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, int masked, uint8_t opcode)
+crb_ws_generate_frame_head(uint64_t data_length, int *head_length, int masked, uint8_t opcode)
 {
 	uint8_t *pos, *frame_data;
 	uint64_t payload_len;
@@ -90,21 +65,21 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 	}
 	
 	// define data length
-	*length = 2;
+	*head_length = 2;
 	
 	if ( payload_len < 126 ) {
 		// pass
 	} else if (payload_len < 65536 ) {
-		*length += 2;
+		*head_length += 2;
 	} else {
-		*length += 8;
+		*head_length += 8;
 	}
 	
 	if ( is_masked ) {
-		 *length += 4;
+		 *head_length += 4;
 	}
 	
-	frame_data = malloc(*length * sizeof(uint8_t));
+	frame_data = malloc(*head_length * sizeof(uint8_t));
 	if ( frame_data == NULL ) {
 		return NULL;
 	}
@@ -145,7 +120,7 @@ crb_ws_frame_head_from_data(uint8_t *data, uint64_t data_length, int *length, in
 }
 
 uint8_t *
-crb_ws_frame_close(int *length, int masked)
+crb_ws_generate_close_frame(int *frame_length, int masked)
 {
 	uint8_t *pos, *data;
 	
@@ -168,13 +143,13 @@ crb_ws_frame_close(int *length, int masked)
 	}
 	
 	// define data length
-	*length = 2;
+	*frame_length = 2;
 	
 	if ( is_masked ) {
-		 *length += 4;
+		 *frame_length += 4;
 	}
 	
-	data = malloc(*length * sizeof(uint8_t));
+	data = malloc(*frame_length * sizeof(uint8_t));
 	if ( data == NULL ) {
 		return NULL;
 	}

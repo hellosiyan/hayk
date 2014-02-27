@@ -6,14 +6,14 @@
 #include "crb_request.h"
 
 
-void crb_request_free(crb_request_t *request);
+static void crb_request_free(crb_http_request_t *request);
 
-crb_header_t *
+crb_http_header_t *
 crb_header_init()
 {
-	crb_header_t *header;
+	crb_http_header_t *header;
 	
-	header = malloc(sizeof(crb_header_t));
+	header = malloc(sizeof(crb_http_header_t));
 	if ( header == NULL ) {
 		return NULL;
 	}
@@ -25,7 +25,7 @@ crb_header_init()
 }
 
 void
-crb_header_free(crb_header_t *header)
+crb_header_free(crb_http_header_t *header)
 {
 	if ( header->name != NULL ) {
 		free(header->name);
@@ -38,12 +38,12 @@ crb_header_free(crb_header_t *header)
 	free(header);
 }
 
-crb_request_t *
+crb_http_request_t *
 crb_request_init()
 {
-	crb_request_t *request;
+	crb_http_request_t *request;
 	
-	request = malloc(sizeof(crb_request_t));
+	request = malloc(sizeof(crb_http_request_t));
 	if ( request == NULL ) {
 		return NULL;
 	}
@@ -57,7 +57,7 @@ crb_request_init()
 }
 
 void
-crb_request_set_uri(crb_request_t *request, char *uri, size_t length)
+crb_request_set_uri(crb_http_request_t *request, char *uri, size_t length)
 {
 	if ( request->uri != NULL ) {
 		free(request->uri);
@@ -74,9 +74,9 @@ crb_request_set_uri(crb_request_t *request, char *uri, size_t length)
 }
 
 void 
-crb_request_add_header(crb_request_t *request, char *name, size_t name_length, char *value, size_t value_length)
+crb_request_add_header(crb_http_request_t *request, char *name, size_t name_length, char *value, size_t value_length)
 {
-	crb_header_t *header = crb_header_init();
+	crb_http_header_t *header = crb_header_init();
 	
 	if ( name == NULL || value == NULL ) {
 		return;
@@ -110,25 +110,25 @@ crb_request_add_header(crb_request_t *request, char *name, size_t name_length, c
 	crb_hash_insert(request->headers, header, header->name, name_length+1);
 }
 
-crb_header_t *
-crb_request_get_header(crb_request_t *request, char *name, size_t name_length)
+crb_http_header_t *
+crb_request_get_header(crb_http_request_t *request, char *name, size_t name_length)
 {
-	crb_header_t *header;
+	crb_http_header_t *header;
 	
 	if ( name_length == -1 ) {
 		name_length = strlen(name)+1;
 	}
 	
-	header = (crb_header_t *) crb_hash_exists_key(request->headers, name, name_length);
+	header = (crb_http_header_t *) crb_hash_exists_key(request->headers, name, name_length);
 	
 	return header;
 }
 
 char *
-crb_request_get_headers_string(crb_request_t *request, int *size)
+crb_request_get_headers_string(crb_http_request_t *request, int *size)
 {
 	crb_buffer_t *buffer;
-	crb_header_t *header;
+	crb_http_header_t *header;
 	char *string;
 	
 	buffer = crb_buffer_init(1024);
@@ -160,13 +160,13 @@ crb_request_get_headers_string(crb_request_t *request, int *size)
 }
 
 void 
-crb_request_ref(crb_request_t *request)
+crb_request_ref(crb_http_request_t *request)
 {
 	crb_atomic_fetch_add( &(request->ref), 1 );
 }
 
 void 
-crb_request_unref(crb_request_t *request)
+crb_request_unref(crb_http_request_t *request)
 {
 	uint32_t old_ref;
 	old_ref = crb_atomic_sub_fetch( &(request->ref), 1 );
@@ -176,8 +176,8 @@ crb_request_unref(crb_request_t *request)
 	}
 }
 
-void
-crb_request_free(crb_request_t *request)
+static void
+crb_request_free(crb_http_request_t *request)
 {
 	if ( request->uri != NULL ) {
 		free(request->uri);
@@ -185,7 +185,7 @@ crb_request_free(crb_request_t *request)
 	}
 	
 	/* Free headers */
-	crb_header_t *header;
+	crb_http_header_t *header;
 	crb_hash_cursor_t *cursor = crb_hash_cursor_init(request->headers);
 
 	while ( (header = crb_hash_cursor_next(cursor)) != NULL ) {

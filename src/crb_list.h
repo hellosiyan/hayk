@@ -24,8 +24,6 @@ void crb_list_free(crb_list_t *list);
 void crb_list_push(crb_list_t *list, void *data);
 void crb_list_unshift(crb_list_t *list, void *data);
 void *crb_list_pop(crb_list_t *list);
-//void *crb_list_shift(crb_list_t *list);
-//void crb_list_remove(crb_list_t *list, void *data);
 
 void crb_list_item_ref(crb_list_item_t *item);
 void crb_list_item_unref(crb_list_item_t *item);

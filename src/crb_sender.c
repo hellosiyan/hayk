@@ -169,7 +169,7 @@ crb_sender_task_broadcast(crb_task_t *task) {
 	data_offset = 0;
 	data_size = frame->data_length;
 	
-	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0, frame->opcode);
+	header = crb_ws_generate_frame_head(data_size, &header_length, 0, frame->opcode);
 	if ( header == NULL ) {
 		crb_log_error("Cannot create frame head");
 		
@@ -229,7 +229,7 @@ crb_sender_task_pong(crb_task_t *task) {
 		return;
 	}
 	
-	header = crb_ws_frame_head_from_data(frame->data, data_size, &header_length, 0, CRB_WS_PONG_FRAME);
+	header = crb_ws_generate_frame_head(data_size, &header_length, 0, CRB_WS_PONG_FRAME);
 	if ( header == NULL ) {
 		crb_log_error("Cannot create frame head");
 		
@@ -259,7 +259,7 @@ crb_sender_task_pong(crb_task_t *task) {
 static void 
 crb_sender_task_handshake(crb_task_t *task)
 {
-	crb_request_t *request;
+	crb_http_request_t *request;
 	crb_client_t *client;
 	int headers_length = 0;
 	char *headers;
@@ -279,7 +279,7 @@ crb_sender_task_handshake(crb_task_t *task)
 	
 	/* Calculate Sec-WebSocket-Accept */
 	{
-		crb_header_t *key_header;
+		crb_http_header_t *key_header;
 		char ws_sha1[SHA_DIGEST_LENGTH];
 		char *ws_base64;
 		int ws_base64_length = 0;
