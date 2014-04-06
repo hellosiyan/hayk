@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-	<title>Caribou Preview</title>
+	<title>Hayk Preview</title>
 	
 	<style type="text/css" media="screen">
 		* { padding: 0; margin: 0; outline: 0; font-family: sans-serif; }
@@ -10,7 +10,7 @@
 		label { display: block; }
 	</style>
 	
-	<script src="caribou.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script src="hayk.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script src="jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script type="text/javascript" language="javascript" charset="utf-8">
 		jQuery(function($){
@@ -18,9 +18,9 @@
 				pane = $('#pane'),
 				stats = {};
 			
-			var crb = new Caribou({
+			var hk = new Hayk({
 				connected: function(){
-					var channel = crb.subscribe("performance");
+					var channel = hk.subscribe("performance");
 					
 					channel.addListener(function(data){
 						if( typeof stats[data] == 'undefined' ) {

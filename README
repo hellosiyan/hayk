@@ -1,5 +1,5 @@
-Caribou - WebSocket Server
+Hayk - WebSocket Server
 
-Caribou is a WebSocket server developed as part of my bachelor thesis. This software is not production ready. Even though it does work, it is merely a proof of concept.   
+Hayk is a WebSocket server. This software is not production ready.   
 
 The server itself is written in C. It is multi process and multi threaded, uses epoll, able to listen on multiple ports and uses easy to edit JSON-like configuration files.   

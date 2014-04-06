@@ -4,26 +4,26 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "crb_worker.h"
-#include "crb_server.h"
+#include "hk_worker.h"
+#include "hk_server.h"
 
-static void crb_print_help_and_exit();
-static crb_server_command_e crb_parse_command_arg(char *command);
+static void hk_print_help_and_exit();
+static hk_server_command_e hk_parse_command_arg(char *command);
 
 int 
 main(int argc, char **argv)
 {
-	crb_server_t *server;
-	crb_server_command_e command;
+	hk_server_t *server;
+	hk_server_command_e command;
 	pid_t server_pid;
 	
 	if ( argc != 2 ) {
 		/* Wrong number of arguments. */
-		crb_print_help_and_exit();
+		hk_print_help_and_exit();
 	}
 	
-	command = crb_parse_command_arg(argv[1]);
-	server_pid = crb_read_pid();
+	command = hk_parse_command_arg(argv[1]);
+	server_pid = hk_read_pid();
 	
 	if ( command == CRB_SERVER_START || command == CRB_SERVER_START_DEBUG ) {
 		if ( server_pid > 0 ) {
@@ -32,16 +32,16 @@ main(int argc, char **argv)
 		}
 		
 		printf("Starting server ...\n");
-		server = crb_server_init();
+		server = hk_server_init();
 		if (server == NULL ) {
 			fprintf(stderr, "Error initializing server.\nAborting\n");
 			return EXIT_FAILURE;
 		}
 		
 		if ( command == CRB_SERVER_START ) {
-			crb_server_start(server);
+			hk_server_start(server);
 		} else {
-			crb_server_start_single_proc(server);
+			hk_server_start_single_proc(server);
 		}
 	} else if ( command == CRB_SERVER_STOP ) {
 		if ( server_pid == 0 ) {
@@ -50,7 +50,7 @@ main(int argc, char **argv)
 		}
 		
 		printf("Stopping server ...\n");
-		crb_server_call_stop(server_pid);
+		hk_server_call_stop(server_pid);
 		printf("[OK]\n");
 	} else if ( command == CRB_SERVER_RESTART ) {
 		if ( server_pid == 0 ) {
@@ -59,34 +59,34 @@ main(int argc, char **argv)
 		}
 		
 		printf("Stopping server ...\n");
-		crb_server_call_stop(server_pid);
+		hk_server_call_stop(server_pid);
 		printf("[OK]\n");
 		
 		printf("Starting server ...\n");
-		server = crb_server_init();
+		server = hk_server_init();
 		if (server == NULL ) {
 			fprintf(stderr, "Error initializing server.\nAborting\n");
 			return EXIT_FAILURE;
 		}
 		
-		crb_server_start(server);
+		hk_server_start(server);
 	}
 	
 	return EXIT_SUCCESS;
 }
 
 static void
-crb_print_help_and_exit()
+hk_print_help_and_exit()
 {
-	printf("Caribou - WebSocket Server\nUsage:\n  caribou {start|stop|restart}\n");
+	printf("Hayk - WebSocket Server\nUsage:\n  hayk {start|stop|restart}\n");
 	exit(EXIT_SUCCESS);
 }
 
-static crb_server_command_e 
-crb_parse_command_arg(char *command)
+static hk_server_command_e 
+hk_parse_command_arg(char *command)
 {
 	if ( command == NULL ) {
-		crb_print_help_and_exit();
+		hk_print_help_and_exit();
 	}
 	
 	if ( strcmp(command, "start") == 0 ) {
@@ -99,7 +99,7 @@ crb_parse_command_arg(char *command)
 		return CRB_SERVER_RESTART;
 	}
 	
-	crb_print_help_and_exit();
+	hk_print_help_and_exit();
 }
 
 

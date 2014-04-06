@@ -1,2 +1,2 @@
-sysconf_DATA = caribou.cfg
+sysconf_DATA = hayk.cfg
 EXTRA_DIST = $(sysconf_DATA)

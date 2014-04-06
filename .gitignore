@@ -13,10 +13,7 @@ src/.deps
 src/*.o
 src/Makefile
 src/Makefile.in
-src/caribou
-tools/*.o
-tools/.deps
-tools/crbperf
+src/hayk
 config.h
 config.log
 config.status

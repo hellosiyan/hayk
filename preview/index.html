@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-	<title>Caribou Preview</title>
+	<title>Hayk Preview</title>
 	
 	<style type="text/css" media="screen">
 		* { font-family: sans-serif; margin: 0; padding: 0; }
@@ -21,7 +21,7 @@
 		ul li .message { display: block; margin: 8px 0 15px; clear: both; color: #000; font-size: 14px; } 
 	</style>
 	
-	<script src="caribou.js" type="text/javascript" language="javascript" charset="utf-8"></script>
+	<script src="hayk.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script src="jquery.min.js" type="text/javascript" language="javascript" charset="utf-8"></script>
 	<script type="text/javascript" language="javascript" charset="utf-8">
 		jQuery(function($){
@@ -29,10 +29,10 @@
 				pane = $('#pane'),
 				pointer = $('#pane-cont .pointer');
 			
-			var crb = new Caribou({
+			var hk = new Hayk({
 				connected: function(){
 					var channels = {},
-						draw = crb.subscribe("draw"),
+						draw = hk.subscribe("draw"),
 						results = $('.results ul');
 					
 					$('#form-channel-sub').submit(function(){
@@ -43,7 +43,7 @@
 							return false;
 						}
 						
-						channels[name] = crb.subscribe(name);
+						channels[name] = hk.subscribe(name);
 						channels[name].addListener(function(data){
 							log_message(this.name, data)
 						});
@@ -62,7 +62,7 @@
 							return false;
 						}
 						
-						crb.unsubscribe(name);
+						hk.unsubscribe(name);
 						delete channels[name];
 						$('select[name=msg_channel] option[name="' + name + '"], select[name=channel_name] option[name="' + name + '"]').remove();
 						
@@ -82,7 +82,7 @@
 							return false;
 						}
 						
-						channels[name] = crb.subscribe(name);
+						channels[name] = hk.subscribe(name);
 						channels[name].send(msg);
 						log_message(name, msg)
 						
