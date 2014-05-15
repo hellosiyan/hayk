@@ -10,6 +10,7 @@ AM_SILENT_RULES([yes])
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_RANLIB
 AM_PROG_CC_C_O
 
 # Checks for libraries.
@@ -29,5 +30,6 @@ AC_CHECK_FUNCS([inet_ntoa socket])
 
 AC_CONFIG_FILES([Makefile
 				 src/Makefile
+				 src/lib/Makefile
 				 conf/Makefile])
 AC_OUTPUT

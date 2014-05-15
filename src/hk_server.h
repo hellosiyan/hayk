@@ -10,9 +10,7 @@
 
 #include "config.h"
 
-#include "hk_list.h"
-#include "hk_worker.h"
-#include "hk_log.h"
+#include "lib/hayk.h"
 
 #define CRB_CONFIG PACKAGE_CONF_FILE
 #define CRB_PIDFILE "/tmp/ws-hayk-VERSION.pid"

@@ -12,8 +12,6 @@
 #include <errno.h>
 
 #include "hk_server.h"
-#include "hk_list.h"
-#include "hk_worker.h"
 
 static hk_server_t *server_inst;
 

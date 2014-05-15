@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "hk_worker.h"
+#include "lib/hayk.h"
 #include "hk_server.h"
 
 static void hk_print_help_and_exit();
