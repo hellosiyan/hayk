@@ -24,6 +24,11 @@ main(int argc, char **argv)
 	
 	command = hk_parse_command_arg(argv[1]);
 	server_pid = hk_read_pid();
+
+	if ( hk_log_init(HK_LOG_ALL, HK_LOG_STDERR | HK_LOG_FILE, CRB_LOGFILE) == -1 ) {
+		fprintf(stderr, "Cannot open log file "CRB_LOGFILE);
+		return EXIT_FAILURE;
+	}
 	
 	if ( command == CRB_SERVER_START || command == CRB_SERVER_START_DEBUG ) {
 		if ( server_pid > 0 ) {

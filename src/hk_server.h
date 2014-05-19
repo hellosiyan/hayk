@@ -14,6 +14,7 @@
 
 #define CRB_CONFIG PACKAGE_CONF_FILE
 #define CRB_PIDFILE "/tmp/ws-hayk-VERSION.pid"
+#define CRB_LOGFILE PACKAGE_DATA_DIR "/hayk.log"
 
 typedef enum {
      CRB_SERVER_START = 0,

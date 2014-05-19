@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hk_atomic.h"
 #include "hk_request.h"
-
+#include "hk_atomic.h"
+#include "hk_buffer.h"
 
 static void hk_request_free(hk_http_request_t *request);
 

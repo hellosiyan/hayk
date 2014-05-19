@@ -1,7 +1,6 @@
 #ifndef __CRB_CHANNEL_H__
 #define __CRB_CHANNEL_H__ 1
 
-#include "hk_task.h"
 #include "hk_client.h"
 #include "hk_hash.h"
 

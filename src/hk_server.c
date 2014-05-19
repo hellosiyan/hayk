@@ -44,11 +44,6 @@ hk_server_init()
 	}
 	server->restart = 0;
 	
-	if ( hk_log_init() == -1 ) {
-		hk_log_error("Cannot open log file");
-		return NULL;
-	}
-	
 	server->config = hk_config_init();
 	if ( !hk_config_load(server->config) ) {
 		hk_log_error("Cannot load config file");

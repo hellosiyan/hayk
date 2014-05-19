@@ -8,11 +8,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "hk_worker.h"
 #include "hk_hash.h"
 #include "hk_client.h"
-#include "hk_channel.h"
-#include "hk_ws.h"
 
 #define CRB_READER_CLIENTS_SCALE 4
 #define CRB_READER_EPOLL_MAX_EVENTS 20

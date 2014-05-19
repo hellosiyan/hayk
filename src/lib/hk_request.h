@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include "hk_buffer.h"
 #include "hk_hash.h"
 
 typedef struct hk_http_header_s hk_http_header_t;

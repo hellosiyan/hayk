@@ -1,14 +1,21 @@
 #ifndef __CRB_LOG_H__
 #define __CRB_LOG_H__ 1
 
-#include <stdio.h>
-#include <time.h>
+typedef enum {
+     HK_LOG_NONE = 0,
+     HK_LOG_MARK = 1 << 1,
+     HK_LOG_INFO = 1 << 2,
+     HK_LOG_DEBUG = 1 << 3,
+     HK_LOG_ERROR = 1 << 4,
+     HK_LOG_ALL = 0xF
+} hk_log_level_e;
 
-#include "hk_worker.h"
+typedef enum {
+     HK_LOG_STDERR = 1 << 1,
+     HK_LOG_FILE = 1 << 2
+} hk_log_destination_e;
 
-#define CRB_LOGFILE PACKAGE_DATA_DIR "/hayk.log"
-
-int hk_log_init();
+int hk_log_init(hk_log_level_e level, hk_log_destination_e destination, const char *file_path);
 void hk_log_info(char *msg);
 void hk_log_debug(char *msg);
 void hk_log_error(char *msg);
