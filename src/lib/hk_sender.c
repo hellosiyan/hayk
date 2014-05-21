@@ -12,7 +12,6 @@
 #include "hk_crypt.h"
 #include "hk_sender.h"
 #include "hk_task.h"
-#include "hk_channel.h"
 #include "hk_ws.h"
 
 static void hk_sender_task_broadcast(hk_task_t *task);
@@ -152,7 +151,6 @@ hk_sender_stop(hk_sender_t *sender)
 
 static void
 hk_sender_task_broadcast(hk_task_t *task) {
-	hk_channel_t *channel;
 	hk_hash_cursor_t *cursor;
 	hk_client_t *client;
 	hk_ws_frame_t *frame;
@@ -164,7 +162,6 @@ hk_sender_task_broadcast(hk_task_t *task) {
 	int header_length;
 	
 	frame = task->data2;
-	channel = task->data;
 	
 	data_offset = 0;
 	data_size = frame->data_length;
@@ -178,12 +175,12 @@ hk_sender_task_broadcast(hk_task_t *task) {
 		return;
 	}
 	
-	cursor = hk_hash_cursor_init(channel->clients);
+	cursor = hk_hash_cursor_init(task->data);
 	while ( (client = hk_hash_cursor_next(cursor)) != NULL ) {
 		data_offset = 0;
 		data_size = frame->data_length;
 		
-		if ( client->state == HK_STATE_OPEN /*&& client->sock_fd != task->client->sock_fd*/ ) {
+		if ( client->state == HK_STATE_OPEN ) {
 			bytes_written = write(client->sock_fd, (char*)header, header_length);
 			
 			bytes_written = write(client->sock_fd, frame->data, data_size);

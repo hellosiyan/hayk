@@ -1,6 +1,5 @@
 #include "hk_atomic.h"
 #include "hk_buffer.h"
-#include "hk_channel.h"
 #include "hk_client.h"
 #include "hk_config.h"
 #include "hk_crypt.h"

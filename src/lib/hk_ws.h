@@ -26,9 +26,6 @@
 #define HK_WS_PONG_FRAME		10
 #define HK_WS_IS_CONTROL_FRAME	8
 
-#define HK_WS_TYPE_DATA	0
-#define HK_WS_TYPE_CONTROL	1
-
 typedef enum {
 	HK_UTF8_NONE,
 	HK_UTF8_CHAR,
@@ -46,7 +43,6 @@ struct hk_ws_frame_s {
 	uint8_t rsv;
 	uint64_t payload_len;
 	uint8_t opcode;
-	uint8_t hk_type;
 	union {
 		uint32_t raw;
 		uint8_t octets[4];

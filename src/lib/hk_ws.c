@@ -31,7 +31,6 @@ hk_ws_frame_init()
 	
 	frame->payload_len = 0;
 	frame->opcode = 0;
-	frame->hk_type = 0;
 	frame->mask.raw = 0;
 	
 	frame->is_masked = 0;
@@ -281,23 +280,6 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 			return unmask_result;
 		}
 		
-		// detect message type (data or control)
-		// remove the first 4 characters for the type id from the plain message
-		// if ( 1 ) {
-			frame->hk_type = HK_WS_TYPE_DATA;
-		// } else if ( hk_strcmp3(read_pos, 'D', 'A', 'T') ) {
-		// 	frame->hk_type = HK_WS_TYPE_DATA;
-		// 	read_pos += 4;
-		// 	frame->payload_len -= 4;
-		// } else if ( hk_strcmp3(read_pos, 'C', 'T', 'L') ) {
-		// 	frame->hk_type = HK_WS_TYPE_CONTROL;
-		// 	read_pos += 4;
-		// 	frame->payload_len -= 4;
-		// } else {
-		// 	hk_log_debug("Unrecognised frame type (dat/ctl).\n");
-		// 	return HK_PARSE_INCOMPLETE;
-		// }
-		
 		frame->data = malloc(frame->payload_len + 1);
 		if ( frame->data == NULL ) {
 			hk_log_error("Cannot allocate memory for payload");
@@ -314,8 +296,6 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 		}
 		
 		hk_ws_frame_unmask(frame, read_pos);
-		
-		frame->hk_type = HK_WS_TYPE_DATA;
 		
 		frame->data = malloc(frame->payload_len + 1);
 		if ( frame->data == NULL ) {

@@ -15,7 +15,6 @@
 #include "hk_reader.h"
 #include "hk_buffer.h"
 #include "hk_task.h"
-#include "hk_channel.h"
 #include "hk_request.h"
 #include "hk_ws.h"
 
@@ -35,8 +34,6 @@ static int hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buff
 static int hk_reader_validate_handshake_request(hk_http_request_t *request);
 static int hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
 static int hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
-static hk_channel_t * hk_reader_parse_data_frame(hk_ws_frame_t *frame);
-static int hk_reader_handle_control_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
 static hk_list_t * hk_reader_parse_control_frame(hk_ws_frame_t *frame);
 
 hk_reader_t *
@@ -320,11 +317,7 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 
 					// take action based on frame type
 					if ( frame->opcode == HK_WS_TEXT_FRAME || frame->opcode == HK_WS_BIN_FRAME ) {
-						if ( frame->hk_type == HK_WS_TYPE_DATA ) {
-							hk_reader_handle_data_frame(reader, client, frame);
-						} else if ( frame->hk_type == HK_WS_TYPE_CONTROL ) {
-							hk_reader_handle_control_frame(reader, client, frame);
-						}
+						hk_reader_handle_data_frame(reader, client, frame);
 					} else if ( frame->opcode == HK_WS_PING_FRAME ) {
 						hk_reader_handle_ping_frame(reader, client, frame);
 					} else if ( frame->opcode == HK_WS_CLOSE_FRAME ) {
@@ -656,14 +649,6 @@ hk_reader_validate_handshake_request(hk_http_request_t *request)
 		}
 	}
 	
-	/*
-	header = hk_request_get_header(request, HK_WS_PROTOCOL, -1);
-	if ( header == NULL || header->value == NULL || strstr(header->value, "hayk") == NULL ) {
-		hk_log_debug("Invalid or missing Sec-WebSocket-Protocol header");
-		return HK_ERROR_INVALID_REQUEST;
-	}
-	*/
-	
 	return HK_VALIDATE_DONE;
 }
 
@@ -671,26 +656,11 @@ static int
 hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
 {
 	hk_task_t *task;
-	hk_channel_t *channel;
-	
-	channel = hk_reader_parse_data_frame(frame);
-	/*if ( channel == NULL ) {
-		// unknown channel name
-		hk_ws_frame_free_with_data(frame);
-		return;
-	} else if ( !hk_channel_client_is_subscribed(channel, client) ) {
-		// not subscribed for this channel
-		hk_log_debug("Not subscribed");
-		hk_ws_frame_free_with_data(frame);
-		return;
-	}*/
-	
-	// hk_log_info(frame->data);
 	
 	task = hk_task_init();
 	hk_task_set_client(task, client);
 	hk_task_set_type(task, HK_TASK_BROADCAST);
-	hk_task_set_data(task, channel);
+	hk_task_set_data(task, reader->clients);
 	hk_task_set_data2(task, frame);
 
 	hk_worker_queue_task(task);
@@ -708,96 +678,6 @@ hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_fram
 	hk_task_set_data2(task, frame);
 
 	hk_worker_queue_task(task);
-}
-
-static hk_channel_t *
-hk_reader_parse_data_frame(hk_ws_frame_t *frame)
-{
-	char *pos;
-	char c, ch, *last;
-	char *channel_name;
-	size_t channel_name_length;
-	return hk_worker_register_channel("test");
-	
-    enum {
-        sw_start = 0,		// 1
-        sw_channel_name,	// 2
-    } state;
-    
-    state = sw_start;
-    last = frame->data + frame->data_length;
-    
-    for (pos = frame->data; pos < last; pos++) {
-    	ch = *pos;
-    	
-    	switch(state) {
-    		case sw_start:
-    			channel_name = pos;
-    			
-		        if (ch == '\n' || ch == '\r' || ch == 0) {
-		            break;
-		        }
-
-		        if ( (ch < 'A' || 0x20 > 'Z') && (ch < 'a' || 0x20 > 'z') ) {
-		        	hk_log_debug("Invalid channel name");
-		            return NULL;
-		        }
-
-		        state = sw_channel_name;
-		        break;
-		    case sw_channel_name:
-    			switch(ch) {
-    				case '(': case ')':
-    				case '<': case '>':
-    				case '@': case ',':
-    				case ';': case '\\':
-    				case '"': case '[':
-    				case ']': case '?':
-    				case '=': case '{':
-    				case '}': case '\r':
-    				case ' ': case '\t':
-    					// separators, not allowed in channel name token
-		        		hk_log_debug("Wrong channel name format");
-					    return NULL;
-    				case '\n':
-    					// end of name
-    					channel_name_length = pos-channel_name;
-					    
-				        return hk_worker_get_channel(channel_name, channel_name_length);
-    			}
-    			break;
-    	}
-	}
-	
-	return NULL;
-}
-
-static int
-hk_reader_handle_control_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
-{
-	hk_list_t *commands;
-	hk_http_header_t *command;
-	hk_channel_t *channel;
-	
-	commands = hk_reader_parse_control_frame(frame);
-	
-	command = (hk_http_header_t *) hk_list_pop(commands);
-	while ( command != NULL ) {
-		if ( strcmp(command->name, "SUBSCRIBE") == 0 ) {
-			channel = hk_worker_register_channel( command->value );
-			hk_channel_subscribe(channel, client);
-		} else if ( strcmp(command->name, "UNSUBSCRIBE") == 0 ) {
-			channel = hk_worker_register_channel( command->value );
-			hk_channel_unsubscribe(channel, client);
-		}
-		
-		hk_header_free(command);
-		
-		command = (hk_http_header_t *) hk_list_pop(commands);
-	}
-	
-	hk_list_free(commands);
-	hk_ws_frame_free_with_data(frame);
 }
 
 static hk_list_t *

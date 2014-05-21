@@ -5,8 +5,6 @@ libhayk_a_SOURCES =   \
     hk_buffer.h       \
     hk_task.c         \
     hk_task.h         \
-    hk_channel.c      \
-    hk_channel.h      \
     hk_client.c       \
     hk_client.h       \
     hk_reader.c       \

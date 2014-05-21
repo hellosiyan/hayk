@@ -3,10 +3,8 @@
 
 #include "hk_hash.h"
 #include "hk_list.h"
-#include "hk_channel.h"
 #include "hk_reader.h"
 #include "hk_sender.h"
-#include "hk_channel.h"
 #include "hk_config.h"
 
 typedef enum {
@@ -22,7 +20,6 @@ struct hk_worker_s {
 	hk_worker_state_e state;
 	int socket_in;
 	
-	hk_hash_t *channels;
 	hk_list_t *readers;
 	hk_list_t *senders;
 	
@@ -40,8 +37,6 @@ int hk_worker_fork_and_run(hk_worker_t * worker);
 int hk_worker_run(hk_worker_t * worker);
 int hk_worker_stop(hk_worker_t * worker);
 void hk_worker_queue_task();
-hk_channel_t *hk_worker_register_channel(char *name);
-hk_channel_t *hk_worker_get_channel(char *name, int name_length);
 hk_worker_t *hk_worker_get();
 
 void hk_worker_on_client_connect(hk_client_t *client);

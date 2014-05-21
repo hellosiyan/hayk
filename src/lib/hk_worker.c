@@ -18,13 +18,11 @@
 #include "hk_client.h"
 #include "hk_reader.h"
 #include "hk_sender.h"
-#include "hk_channel.h"
 #include "hk_hash.h"
 #include "hk_list.h"
 
 
 #define SERVER_PORT 8080
-#define HK_WORKER_CHANNELS_SCALE 4
 
 
 static hk_worker_t *worker_inst;
@@ -56,7 +54,6 @@ hk_worker_create(hk_config_entry_t *config)
 	
 	worker->state = HK_WORKER_STOPPED;
 	
-	worker->channels = hk_hash_init(HK_WORKER_CHANNELS_SCALE);
 	worker->readers = hk_list_init();
 	worker->senders = hk_list_init();
 	
@@ -262,19 +259,6 @@ _hk_worker_stop()
 	}
 	
 	worker->state = HK_WORKER_STOPPED;
-	
-	{
-		/* Free channel pool */
-		hk_channel_t *channel;
-		hk_hash_cursor_t *cursor = hk_hash_cursor_init(worker->channels);
-	
-		while ( (channel = hk_hash_cursor_next(cursor)) != NULL ) {
-			hk_channel_free(channel);
-		}
-	
-		hk_hash_cursor_free(cursor);
-		hk_hash_free(worker->channels);
-	}
 }
 
 void
@@ -288,64 +272,21 @@ hk_worker_queue_task(hk_task_t *task)
 	sem_post(&sender->sem_tasks);
 }
 
-hk_channel_t *
-hk_worker_register_channel(char *name)
-{
-	hk_worker_t *worker = hk_worker_get();
-	hk_channel_t *channel;
-	
-	channel = hk_hash_exists_key(worker->channels, name, strlen(name));
-	
-	if ( channel == NULL ) {
-		channel = hk_channel_init();
-		hk_channel_set_name(channel, name);
-		channel = hk_hash_insert(worker->channels, channel, name, strlen(name));
-	}
-	
-	return channel;
-}
-
-hk_channel_t *
-hk_worker_get_channel(char *name, int name_length)
-{
-	hk_worker_t *worker = hk_worker_get();
-	
-	if ( name_length == -1 ) {
-		name_length = strlen(name);
-	}
-	
-	return hk_hash_exists_key(worker->channels, name, name_length);
-}
-
 void
 hk_worker_on_client_connect(hk_client_t *client)
 {
 	client->state = HK_STATE_CONNECTING;
 	hk_reader_add_client(worker_inst->active_reader, client);
-	
-	/* TODO: remove; begin test code */
-	hk_channel_subscribe(hk_worker_register_channel("test"), client);
-	/* end test code */
 }
 
 void
 hk_worker_on_client_disconnect(hk_client_t *client)
 {
-	hk_channel_t *channel;
-	hk_hash_cursor_t *cursor;
-	
 	if ( client == NULL ) {
 		return;
 	}
-	
-	/* Unsubscribe client from all channels */
-	cursor = hk_hash_cursor_init(worker_inst->channels);
 
-	while ( (channel = hk_hash_cursor_next(cursor)) != NULL ) {
-		hk_channel_unsubscribe(channel, client);
-	}
-
-	hk_hash_cursor_free(cursor);
+	// pass
 }
 
 static void 
