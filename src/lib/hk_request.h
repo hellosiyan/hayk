@@ -1,5 +1,5 @@
-#ifndef __CRB_REQUEST_H__
-#define __CRB_REQUEST_H__ 1
+#ifndef __HK_REQUEST_H__
+#define __HK_REQUEST_H__ 1
 
 #include <stdint.h>
 
@@ -31,4 +31,4 @@ void hk_request_add_header(hk_http_request_t *request, char *name, size_t name_l
 char *hk_request_get_headers_string(hk_http_request_t *request, int *size);
 hk_http_header_t *hk_request_get_header(hk_http_request_t *request, char *name, size_t name_length);
 
-#endif /* __CRB_REQUEST_H__ */
+#endif /* __HK_REQUEST_H__ */

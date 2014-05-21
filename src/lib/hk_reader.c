@@ -49,7 +49,7 @@ hk_reader_init()
         return NULL;
     }
     
-	reader->clients = hk_hash_init(CRB_READER_CLIENTS_SCALE);
+	reader->clients = hk_hash_init(HK_READER_CLIENTS_SCALE);
     reader->running = 0;
     reader->client_count = 0;
     reader->cid = 0;
@@ -83,7 +83,7 @@ hk_reader_loop(void *data)
 	buf[4095] = '\0';
 	
 	reader = (hk_reader_t *) data;
-	events = calloc (CRB_READER_EPOLL_MAX_EVENTS, sizeof (struct epoll_event));
+	events = calloc (HK_READER_EPOLL_MAX_EVENTS, sizeof (struct epoll_event));
 	if ( events == NULL ) {
 		hk_log_error("Cannot allocate epoll events array");
 		return 0;
@@ -91,7 +91,7 @@ hk_reader_loop(void *data)
 
 	reader->running = 1;
 	while(reader->running) {
-		n = epoll_wait (reader->epoll_fd, events, CRB_READER_EPOLL_MAX_EVENTS, 250);
+		n = epoll_wait (reader->epoll_fd, events, HK_READER_EPOLL_MAX_EVENTS, 250);
 		
 		for (i = 0; i < n; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
@@ -216,7 +216,7 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 	frame = NULL;
 	
 	switch(client->data_state) {
-		case CRB_DATA_STATE_HANDSHAKE:
+		case HK_DATA_STATE_HANDSHAKE:
 			handshake_request = client->request;
 
 			if ( handshake_request == NULL ) {
@@ -226,17 +226,17 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 
 			result = hk_reader_parse_handshake_request(handshake_request, client->buffer_in);
 			
-			if ( result == CRB_ERROR_INVALID_METHOD || result == CRB_ERROR_INVALID_REQUEST ) {
+			if ( result == HK_ERROR_INVALID_METHOD || result == HK_ERROR_INVALID_REQUEST ) {
 				// Close client
 				hk_reader_drop_client(reader, client);
-			} else if ( result == CRB_PARSE_INCOMPLETE ) {
+			} else if ( result == HK_PARSE_INCOMPLETE ) {
 				// Wait for more data, reset read position and free request
 				hk_client_set_handshake_request(client, NULL);
 				client->buffer_in->rpos = client->buffer_in->ptr;
-			} else if( result == CRB_PARSE_DONE ) {
+			} else if( result == HK_PARSE_DONE ) {
 				// Validate handshake
 				result = hk_reader_validate_handshake_request(handshake_request);
-				if ( result != CRB_VALIDATE_DONE ) {
+				if ( result != HK_VALIDATE_DONE ) {
 					// Invalid WebSocket request
 					hk_reader_drop_client(reader, client);
 					break;
@@ -246,36 +246,36 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 				hk_task_t *task;
 				task = hk_task_init();
 				hk_task_set_client(task, client);
-				hk_task_set_type(task, CRB_TASK_HANDSHAKE);
+				hk_task_set_type(task, HK_TASK_HANDSHAKE);
 				
-				client->state = CRB_STATE_OPEN;
-				client->data_state = CRB_DATA_STATE_FRAME;
+				client->state = HK_STATE_OPEN;
+				client->data_state = HK_DATA_STATE_FRAME;
 				hk_buffer_clear(client->buffer_in);
 				
 				hk_worker_queue_task(task);
 			}
 			break;
-		case CRB_DATA_STATE_FRAME:
-		case CRB_DATA_STATE_FRAME_FRAGMENT:
+		case HK_DATA_STATE_FRAME:
+		case HK_DATA_STATE_FRAME_FRAGMENT:
 			parse_frame_from_buffer:
 			frame = hk_ws_frame_init();
-			if ( client->data_state == CRB_DATA_STATE_FRAME_FRAGMENT ) {
+			if ( client->data_state == HK_DATA_STATE_FRAME_FRAGMENT ) {
 				frame->utf8_state = client->fragmented_frame->utf8_state;
 			}
 			result = hk_ws_frame_parse_buffer(frame, client->buffer_in);
 			
-			if ( result == CRB_PARSE_INCOMPLETE ) {
+			if ( result == HK_PARSE_INCOMPLETE ) {
 				// Wait for more data
 				hk_ws_frame_free_with_data(frame);
-			} else if ( result == CRB_ERROR_INVALID_OPCODE ) {
+			} else if ( result == HK_ERROR_INVALID_OPCODE ) {
 				// skip frame
 				hk_ws_frame_free_with_data(frame);
 				hk_reader_drop_client(reader, client);
-			} else if (result == CRB_ERROR_CRITICAL) {
+			} else if (result == HK_ERROR_CRITICAL) {
 				// Close client to try to recover
 				hk_ws_frame_free_with_data(frame);
 				hk_reader_drop_client(reader, client);
-			} else if ( result == CRB_PARSE_DONE ) {
+			} else if ( result == HK_PARSE_DONE ) {
 				// Valid frame structure
 				if( frame->is_masked == 0 ) {
 					hk_log_error("Received non-masked frame from client");
@@ -286,17 +286,17 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 					hk_ws_frame_free_with_data(frame);
 					hk_reader_drop_client(reader, client);
 					break;
-				} else if ( (frame->opcode & CRB_WS_IS_CONTROL_FRAME) != 0 && !frame->is_fin ) {
+				} else if ( (frame->opcode & HK_WS_IS_CONTROL_FRAME) != 0 && !frame->is_fin ) {
 					hk_log_error("Received fragmented control frame");
 					hk_ws_frame_free_with_data(frame);
 					hk_reader_drop_client(reader, client);
 					break;
-				} else if ( frame->opcode == CRB_WS_CONT_FRAME && client->data_state == CRB_DATA_STATE_FRAME ) {
+				} else if ( frame->opcode == HK_WS_CONT_FRAME && client->data_state == HK_DATA_STATE_FRAME ) {
 					hk_log_error("No message to continue");
 					hk_ws_frame_free_with_data(frame);
 					hk_reader_drop_client(reader, client);
 					break;
-				} else if ( client->data_state == CRB_DATA_STATE_FRAME_FRAGMENT && (frame->opcode != CRB_WS_CONT_FRAME && (frame->opcode & CRB_WS_IS_CONTROL_FRAME) == 0) ) {
+				} else if ( client->data_state == HK_DATA_STATE_FRAME_FRAGMENT && (frame->opcode != HK_WS_CONT_FRAME && (frame->opcode & HK_WS_IS_CONTROL_FRAME) == 0) ) {
 					hk_log_error("Data frame injected in fragmanted message");
 					hk_ws_frame_free_with_data(frame);
 					hk_reader_drop_client(reader, client);
@@ -305,29 +305,29 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 
 				if ( !frame->is_fin ) {
 					// Handle fragmentation
-					client->data_state = CRB_DATA_STATE_FRAME_FRAGMENT;
+					client->data_state = HK_DATA_STATE_FRAME_FRAGMENT;
 					hk_client_add_fragment(client, frame);
 					hk_ws_frame_free_with_data(frame);
 				} else {
 					// Replace last continuation frame with the original fragmented frame header
-					if ( frame->opcode == CRB_WS_CONT_FRAME ) {
+					if ( frame->opcode == HK_WS_CONT_FRAME ) {
 						hk_client_add_fragment(client, frame);
 						hk_ws_frame_free_with_data(frame);
 
 						frame = hk_client_compile_fragments(client);
-						client->data_state = CRB_DATA_STATE_FRAME;
+						client->data_state = HK_DATA_STATE_FRAME;
 					}
 
 					// take action based on frame type
-					if ( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME ) {
-						if ( frame->hk_type == CRB_WS_TYPE_DATA ) {
+					if ( frame->opcode == HK_WS_TEXT_FRAME || frame->opcode == HK_WS_BIN_FRAME ) {
+						if ( frame->hk_type == HK_WS_TYPE_DATA ) {
 							hk_reader_handle_data_frame(reader, client, frame);
-						} else if ( frame->hk_type == CRB_WS_TYPE_CONTROL ) {
+						} else if ( frame->hk_type == HK_WS_TYPE_CONTROL ) {
 							hk_reader_handle_control_frame(reader, client, frame);
 						}
-					} else if ( frame->opcode == CRB_WS_PING_FRAME ) {
+					} else if ( frame->opcode == HK_WS_PING_FRAME ) {
 						hk_reader_handle_ping_frame(reader, client, frame);
-					} else if ( frame->opcode == CRB_WS_CLOSE_FRAME ) {
+					} else if ( frame->opcode == HK_WS_CLOSE_FRAME ) {
 						// Close frame - end the connection
 						hk_ws_frame_free_with_data(frame);
 						hk_reader_drop_client(reader, client);
@@ -375,7 +375,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     last = buffer->ptr + buffer->used;
     
     if ( buffer->rpos >= last ) {
-    	return CRB_PARSE_INCOMPLETE;
+    	return HK_PARSE_INCOMPLETE;
     }
     
     for (; buffer->rpos < last; buffer->rpos++) {
@@ -391,7 +391,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 		        }
 
 		        if (ch < 'A' || ch > 'Z') {
-		            return CRB_ERROR_INVALID_METHOD;
+		            return HK_ERROR_INVALID_METHOD;
 		        }
 
 		        state = sw_method;
@@ -403,10 +403,10 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 				        break;
     				}
     				
-					return CRB_ERROR_INVALID_METHOD;
+					return HK_ERROR_INVALID_METHOD;
     			} else if( ch < 'A' || ch > 'Z' ) {
 	        		// Method name must be GET
-					return CRB_ERROR_INVALID_METHOD;
+					return HK_ERROR_INVALID_METHOD;
     			}
     			break;
     		case sw_spaces_before_uri:
@@ -426,7 +426,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 				        break;
 				    default:
 				    	// character not allowed here
-				        return CRB_ERROR_INVALID_REQUEST;
+				        return HK_ERROR_INVALID_REQUEST;
 		        }
 		        break;
 		        
@@ -441,7 +441,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 				    case '\n':
 				    case '\r':
 				    case '\0':
-				        return CRB_ERROR_INVALID_REQUEST;
+				        return HK_ERROR_INVALID_REQUEST;
 		        }
 		        break;
 			case sw_spaces_before_http:
@@ -453,7 +453,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 					case ' ':
 						break;
 					default:
-				        return CRB_ERROR_INVALID_REQUEST;
+				        return HK_ERROR_INVALID_REQUEST;
 				}
 		    	break;
 		    case sw_http:
@@ -467,12 +467,12 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 						if ( p - left == 7 && hk_strcmp8(left, 'H', 'T', 'T', 'P', '/', '1', '.', '1') ) {
 							state = sw_header_crlf;
 						} else if ( p - left > 7 ) {
-							return CRB_ERROR_INVALID_REQUEST;
+							return HK_ERROR_INVALID_REQUEST;
 						}
 						break;
 					default:
 						// character not part of "HTTP/1.1" identificator
-					    return CRB_ERROR_INVALID_REQUEST;
+					    return HK_ERROR_INVALID_REQUEST;
 		    	}
 		    	break;
 		    case sw_header_crlf:
@@ -498,7 +498,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     					break;
     				case '\n':
     					if ( is_crlf ) {
-							return CRB_PARSE_DONE;
+							return HK_PARSE_DONE;
     					} else {				
 							is_crlf = 1;
     					}
@@ -539,7 +539,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     				case '\t':
     					// separators, not allowed in header name token
     					hk_log_debug("Invalid header name format");
-					    return CRB_ERROR_INVALID_REQUEST;
+					    return HK_ERROR_INVALID_REQUEST;
     				case ':':
     					// end of name
     					right = p;
@@ -580,7 +580,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 							trailing_ws = 0;
 						    
 						    hk_request_add_header(request, header_name, header_name_length, left, right-left);
-							return CRB_PARSE_DONE;
+							return HK_PARSE_DONE;
 						} else {
     						is_crlf = 1;
 						}
@@ -616,7 +616,7 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     	}
     }
     
-    return CRB_PARSE_INCOMPLETE;
+    return HK_PARSE_INCOMPLETE;
 }
 
 static int
@@ -627,44 +627,44 @@ hk_reader_validate_handshake_request(hk_http_request_t *request)
 	
 	worker = hk_worker_get();
 	
-	header = hk_request_get_header(request, CRB_WS_KEY, -1);
+	header = hk_request_get_header(request, HK_WS_KEY, -1);
 	if ( header == NULL || header->value == NULL ) {
 		hk_log_debug("Invalid or missing Sec-WebSocket-Key header");
-		return CRB_ERROR_INVALID_REQUEST;
+		return HK_ERROR_INVALID_REQUEST;
 	}
 	
-	header = hk_request_get_header(request, CRB_WS_VERSION, -1);
+	header = hk_request_get_header(request, HK_WS_VERSION, -1);
 	
 	if ( header == NULL || header->value == NULL ) {
 		hk_log_debug("Missing Sec-WebSocket-Version header");
-		return CRB_ERROR_INVALID_REQUEST;
+		return HK_ERROR_INVALID_REQUEST;
 	} else if ( !(hk_strcmp2(header->value, '1', '3')) ) {
 		printf("version: %s\n", header->value);
 		hk_log_debug("Invalid Sec-WebSocket-Version header");
-		return CRB_ERROR_INVALID_REQUEST;
+		return HK_ERROR_INVALID_REQUEST;
 	}
 	
 	if ( worker->config->origins != NULL ) {
 		// Same-Origin policy
-		header = hk_request_get_header(request, CRB_WS_ORIGIN, -1);
+		header = hk_request_get_header(request, HK_WS_ORIGIN, -1);
 		if ( header == NULL || header->value == NULL ) {
 			hk_log_debug("Invalid or missing Origin header");
-			return CRB_ERROR_INVALID_REQUEST;
+			return HK_ERROR_INVALID_REQUEST;
 		} else if( !hk_hash_exists_key(worker->config->origins, header->value, strlen(header->value)) ) {
 			hk_log_debug("Restricted origin");
-			return CRB_ERROR_INVALID_REQUEST;
+			return HK_ERROR_INVALID_REQUEST;
 		}
 	}
 	
 	/*
-	header = hk_request_get_header(request, CRB_WS_PROTOCOL, -1);
+	header = hk_request_get_header(request, HK_WS_PROTOCOL, -1);
 	if ( header == NULL || header->value == NULL || strstr(header->value, "hayk") == NULL ) {
 		hk_log_debug("Invalid or missing Sec-WebSocket-Protocol header");
-		return CRB_ERROR_INVALID_REQUEST;
+		return HK_ERROR_INVALID_REQUEST;
 	}
 	*/
 	
-	return CRB_VALIDATE_DONE;
+	return HK_VALIDATE_DONE;
 }
 
 static int
@@ -689,7 +689,7 @@ hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_fram
 	
 	task = hk_task_init();
 	hk_task_set_client(task, client);
-	hk_task_set_type(task, CRB_TASK_BROADCAST);
+	hk_task_set_type(task, HK_TASK_BROADCAST);
 	hk_task_set_data(task, channel);
 	hk_task_set_data2(task, frame);
 
@@ -703,7 +703,7 @@ hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_fram
 	
 	task = hk_task_init();
 	hk_task_set_client(task, client);
-	hk_task_set_type(task, CRB_TASK_PONG);
+	hk_task_set_type(task, HK_TASK_PONG);
 	hk_task_set_data(task, NULL);
 	hk_task_set_data2(task, frame);
 

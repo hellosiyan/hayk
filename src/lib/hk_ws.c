@@ -38,7 +38,7 @@ hk_ws_frame_init()
 	
 	frame->data = NULL;
 	frame->data_length = 0;
-	frame->utf8_state = CRB_UTF8_NONE;
+	frame->utf8_state = HK_UTF8_NONE;
 	
 	return frame;
 }
@@ -133,7 +133,7 @@ hk_ws_generate_close_frame(int *frame_length, int masked)
 	int is_masked;
 	
 	// define frame properties 
-	opcode = CRB_WS_CLOSE_FRAME;
+	opcode = HK_WS_CLOSE_FRAME;
 	
 	if ( masked ) {
 		is_masked = 1;
@@ -180,27 +180,27 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	char *read_pos = NULL;
 	
 	if ( frame == NULL || buffer == NULL ) {
-		return CRB_PARSE_INCOMPLETE;
+		return HK_PARSE_INCOMPLETE;
 	}
 	
 	read_pos = buffer->rpos;
 	
 	if ( buffer->used < 2 ) {
-		return CRB_PARSE_INCOMPLETE;
+		return HK_PARSE_INCOMPLETE;
 	}
 	
 	raw = * (uint16_t*) read_pos;
 	
 	// Opcode
 	switch( raw & 15 ) {
-		case CRB_WS_CONT_FRAME: frame->opcode = CRB_WS_CONT_FRAME; break;
-		case CRB_WS_TEXT_FRAME: frame->opcode = CRB_WS_TEXT_FRAME; break;
-		case CRB_WS_BIN_FRAME: frame->opcode = CRB_WS_BIN_FRAME; break;
-		case CRB_WS_CLOSE_FRAME: frame->opcode = CRB_WS_CLOSE_FRAME; break;
-		case CRB_WS_PING_FRAME: frame->opcode = CRB_WS_PING_FRAME; break;
-		case CRB_WS_PONG_FRAME: frame->opcode = CRB_WS_PONG_FRAME; break;
+		case HK_WS_CONT_FRAME: frame->opcode = HK_WS_CONT_FRAME; break;
+		case HK_WS_TEXT_FRAME: frame->opcode = HK_WS_TEXT_FRAME; break;
+		case HK_WS_BIN_FRAME: frame->opcode = HK_WS_BIN_FRAME; break;
+		case HK_WS_CLOSE_FRAME: frame->opcode = HK_WS_CLOSE_FRAME; break;
+		case HK_WS_PING_FRAME: frame->opcode = HK_WS_PING_FRAME; break;
+		case HK_WS_PONG_FRAME: frame->opcode = HK_WS_PONG_FRAME; break;
 		default:
-			return CRB_ERROR_INVALID_OPCODE;
+			return HK_ERROR_INVALID_OPCODE;
 	}
 
 	// RSV bits
@@ -223,13 +223,13 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 		// 16bit length
 		// require the next 2 bytes
 		if ( buffer->used < 4 ) {
-			return CRB_PARSE_INCOMPLETE;
+			return HK_PARSE_INCOMPLETE;
 		}
 		
 		frame->payload_len = ntohs(*(uint16_t *) (read_pos + 2));
 		
-		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			return CRB_PARSE_INCOMPLETE;
+		if ( frame->payload_len < 4 && frame->opcode == HK_WS_TEXT_FRAME ) {
+			return HK_PARSE_INCOMPLETE;
 		}
 		
 		read_pos = read_pos + 4; 
@@ -237,22 +237,22 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 		// 64bit length
 		// require the next 8 bytes
 		if ( buffer->used < 10 ) {
-			return CRB_PARSE_INCOMPLETE;
+			return HK_PARSE_INCOMPLETE;
 		}
 		
 		frame->payload_len = ntohl(* (uint32_t *) (read_pos + 2));
 		frame->payload_len <<= 32;
 		frame->payload_len += ntohl(* (uint32_t *) (read_pos + 6));
 		
-		if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-			return CRB_PARSE_INCOMPLETE;
+		if ( frame->payload_len < 4 && frame->opcode == HK_WS_TEXT_FRAME ) {
+			return HK_PARSE_INCOMPLETE;
 		}
 		
 		read_pos = read_pos + 10; 
 	} else {
 		// // Hayk specific
-		// if ( frame->payload_len < 4 && frame->opcode == CRB_WS_TEXT_FRAME ) {
-		// 	return CRB_PARSE_INCOMPLETE;
+		// if ( frame->payload_len < 4 && frame->opcode == HK_WS_TEXT_FRAME ) {
+		// 	return HK_PARSE_INCOMPLETE;
 		// }
 		read_pos = read_pos + 2; 
 	}
@@ -260,7 +260,7 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	// Masking key
 	if ( frame->is_masked ) {
 		if ( buffer->used < (read_pos + 4) - buffer->ptr ) {
-			return CRB_PARSE_INCOMPLETE;
+			return HK_PARSE_INCOMPLETE;
 		}
 	
 		frame->mask.raw = * (uint32_t *) read_pos;
@@ -269,58 +269,58 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	
 	// Payload
 	if ( buffer->used <= (read_pos + frame->payload_len) - buffer->ptr ) {
-		return CRB_PARSE_INCOMPLETE;
+		return HK_PARSE_INCOMPLETE;
 	}
 	
 	// Payload / Unmask 
-	if( frame->opcode == CRB_WS_TEXT_FRAME || frame->opcode == CRB_WS_BIN_FRAME || frame->opcode == CRB_WS_CONT_FRAME  ) {
+	if( frame->opcode == HK_WS_TEXT_FRAME || frame->opcode == HK_WS_BIN_FRAME || frame->opcode == HK_WS_CONT_FRAME  ) {
 		int unmask_result;
 
 		unmask_result = hk_ws_frame_unmask_utf8_stream(frame, read_pos);
-		if ( unmask_result != CRB_UNMASK_DONE ) {
+		if ( unmask_result != HK_UNMASK_DONE ) {
 			return unmask_result;
 		}
 		
 		// detect message type (data or control)
 		// remove the first 4 characters for the type id from the plain message
 		// if ( 1 ) {
-			frame->hk_type = CRB_WS_TYPE_DATA;
+			frame->hk_type = HK_WS_TYPE_DATA;
 		// } else if ( hk_strcmp3(read_pos, 'D', 'A', 'T') ) {
-		// 	frame->hk_type = CRB_WS_TYPE_DATA;
+		// 	frame->hk_type = HK_WS_TYPE_DATA;
 		// 	read_pos += 4;
 		// 	frame->payload_len -= 4;
 		// } else if ( hk_strcmp3(read_pos, 'C', 'T', 'L') ) {
-		// 	frame->hk_type = CRB_WS_TYPE_CONTROL;
+		// 	frame->hk_type = HK_WS_TYPE_CONTROL;
 		// 	read_pos += 4;
 		// 	frame->payload_len -= 4;
 		// } else {
 		// 	hk_log_debug("Unrecognised frame type (dat/ctl).\n");
-		// 	return CRB_PARSE_INCOMPLETE;
+		// 	return HK_PARSE_INCOMPLETE;
 		// }
 		
 		frame->data = malloc(frame->payload_len + 1);
 		if ( frame->data == NULL ) {
 			hk_log_error("Cannot allocate memory for payload");
-			return CRB_ERROR_CRITICAL;
+			return HK_ERROR_CRITICAL;
 		}
 		
 		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
 		frame->data_length = frame->payload_len;
 		frame->data[frame->data_length] = '\0';
-	} else if( frame->opcode == CRB_WS_PING_FRAME  ) {
+	} else if( frame->opcode == HK_WS_PING_FRAME  ) {
 		if ( frame->payload_len > 125 ) {
 			// Control frames are allowed payload up to 125 bytes
-			return CRB_ERROR_CRITICAL;
+			return HK_ERROR_CRITICAL;
 		}
 		
 		hk_ws_frame_unmask(frame, read_pos);
 		
-		frame->hk_type = CRB_WS_TYPE_DATA;
+		frame->hk_type = HK_WS_TYPE_DATA;
 		
 		frame->data = malloc(frame->payload_len + 1);
 		if ( frame->data == NULL ) {
 			hk_log_error("Cannot allocate memory for payload");
-			return CRB_ERROR_CRITICAL;
+			return HK_ERROR_CRITICAL;
 		}
 
 		frame->data = memcpy(frame->data, read_pos, frame->payload_len);
@@ -331,7 +331,7 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	read_pos = read_pos + frame->payload_len;
 	buffer->rpos = read_pos;
 	
-	return CRB_PARSE_DONE;
+	return HK_PARSE_DONE;
 }
 
 void 
@@ -372,7 +372,7 @@ hk_ws_frame_unmask(hk_ws_frame_t *frame, char *stream)
 		*(stream+i) = ch;
 	}
 
-	return CRB_UNMASK_DONE;
+	return HK_UNMASK_DONE;
 }
 
 static inline int 
@@ -383,9 +383,9 @@ hk_ws_frame_unmask_utf8_stream(hk_ws_frame_t *frame, char *stream)
 	hk_utf8_state_e expect;
 
 	switch(frame->opcode) {
-		case CRB_WS_TEXT_FRAME: expect = CRB_UTF8_CHAR; break;
-		case CRB_WS_BIN_FRAME: expect = CRB_UTF8_NONE; break;
-		case CRB_WS_CONT_FRAME: expect = frame->utf8_state; break;
+		case HK_WS_TEXT_FRAME: expect = HK_UTF8_CHAR; break;
+		case HK_WS_BIN_FRAME: expect = HK_UTF8_NONE; break;
+		case HK_WS_CONT_FRAME: expect = frame->utf8_state; break;
 	}
 
 	for (i = 0; i < frame->payload_len; i += 1) {
@@ -394,69 +394,69 @@ hk_ws_frame_unmask_utf8_stream(hk_ws_frame_t *frame, char *stream)
 		*(stream+i) = ch;
 
 		/* none */
-		if ( expect == CRB_UTF8_NONE ) {
+		if ( expect == HK_UTF8_NONE ) {
 			// continue;
 
 		/* utf8 code */
-		} else if ( expect == CRB_UTF8_CHAR ) {
+		} else if ( expect == HK_UTF8_CHAR ) {
 			/* utf8 1 octet */
 			if ( ch <= 0x7F ) { // ascii
-				expect = CRB_UTF8_CHAR;
+				expect = HK_UTF8_CHAR;
 			/* utf8 2 octets */
 			} else if ( (ch >= 0xC2 && ch <= 0xDF) ) {
-				expect = CRB_UTF8_TAIL;
+				expect = HK_UTF8_TAIL;
 			/* utf 3 octets */
 			} else if ( ch == 0xE0 ) {
-				expect = CRB_UTF8_3_OCTETS_1;
+				expect = HK_UTF8_3_OCTETS_1;
 			} else if ( (ch >= 0xE1 && ch <= 0xEC) ) {
-				expect = CRB_UTF8_TAIL_X2;
+				expect = HK_UTF8_TAIL_X2;
 			} else if ( ch == 0xED ) {
-				expect = CRB_UTF8_3_OCTETS_2;
+				expect = HK_UTF8_3_OCTETS_2;
 			} else if ( (ch >= 0xEE && ch <= 0xEF) ) {
-				expect = CRB_UTF8_TAIL_X2;
+				expect = HK_UTF8_TAIL_X2;
 			/* utf 4 octets */
 			} else if ( ch == 0xF0 ) {
-				expect = CRB_UTF8_4_OCTETS_1;
+				expect = HK_UTF8_4_OCTETS_1;
 			} else if ( (ch >= 0xF1 && ch <= 0xF3) ) {
-				expect = CRB_UTF8_TAIL_X3;
+				expect = HK_UTF8_TAIL_X3;
 			} else if ( ch == 0xF4 ) {
-				expect = CRB_UTF8_4_OCTETS_2;
+				expect = HK_UTF8_4_OCTETS_2;
 			} else {
 				hk_log_error("Invalid UTF-8 sequence");
-				return CRB_ERROR_CRITICAL;
+				return HK_ERROR_CRITICAL;
 			}
 			
 		/* utf8 3 octets */
-		} else if ( expect == CRB_UTF8_3_OCTETS_1 && (ch >= 0xA0 && ch <= 0xBF) ) {
-			expect = CRB_UTF8_TAIL;
-		} else if ( expect == CRB_UTF8_3_OCTETS_2 && (ch >= 0x80 && ch <= 0x9F) ) {
-			expect = CRB_UTF8_TAIL;
+		} else if ( expect == HK_UTF8_3_OCTETS_1 && (ch >= 0xA0 && ch <= 0xBF) ) {
+			expect = HK_UTF8_TAIL;
+		} else if ( expect == HK_UTF8_3_OCTETS_2 && (ch >= 0x80 && ch <= 0x9F) ) {
+			expect = HK_UTF8_TAIL;
 
 		/* utf8 4 octets */
-		} else if ( expect == CRB_UTF8_4_OCTETS_1 && (ch >= 0x90 && ch <= 0xBF) ) {
-			expect = CRB_UTF8_TAIL_X2;
-		} else if ( expect == CRB_UTF8_4_OCTETS_2 && (ch >= 0x80 && ch <= 0x8F) ) {
-			expect = CRB_UTF8_TAIL_X2;
+		} else if ( expect == HK_UTF8_4_OCTETS_1 && (ch >= 0x90 && ch <= 0xBF) ) {
+			expect = HK_UTF8_TAIL_X2;
+		} else if ( expect == HK_UTF8_4_OCTETS_2 && (ch >= 0x80 && ch <= 0x8F) ) {
+			expect = HK_UTF8_TAIL_X2;
 		
 		/* utf8 tail */
-		} else if ( expect == CRB_UTF8_TAIL && (ch >= 0x80 && ch <= 0xBF) ) {
-			expect = CRB_UTF8_CHAR;
-		} else if ( expect == CRB_UTF8_TAIL_X2 && (ch >= 0x80 && ch <= 0xBF) ) {
-			expect = CRB_UTF8_TAIL;
-		} else if ( expect == CRB_UTF8_TAIL_X3 && (ch >= 0x80 && ch <= 0xBF) ) {
-			expect = CRB_UTF8_TAIL_X2;
+		} else if ( expect == HK_UTF8_TAIL && (ch >= 0x80 && ch <= 0xBF) ) {
+			expect = HK_UTF8_CHAR;
+		} else if ( expect == HK_UTF8_TAIL_X2 && (ch >= 0x80 && ch <= 0xBF) ) {
+			expect = HK_UTF8_TAIL;
+		} else if ( expect == HK_UTF8_TAIL_X3 && (ch >= 0x80 && ch <= 0xBF) ) {
+			expect = HK_UTF8_TAIL_X2;
 		} else {
 			hk_log_error("Invalid UTF-8 sequence");
-			return CRB_ERROR_CRITICAL;
+			return HK_ERROR_CRITICAL;
 		}
 	}
 
-	if ( frame->is_fin && expect != CRB_UTF8_CHAR && expect != CRB_UTF8_NONE ) {
+	if ( frame->is_fin && expect != HK_UTF8_CHAR && expect != HK_UTF8_NONE ) {
 		hk_log_error("Invalid UTF-8 sequence");
-		return CRB_ERROR_CRITICAL;
+		return HK_ERROR_CRITICAL;
 	}
 
 	frame->utf8_state = expect;
 
-	return CRB_UNMASK_DONE;
+	return HK_UNMASK_DONE;
 }

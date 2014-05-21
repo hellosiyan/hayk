@@ -1,5 +1,5 @@
-#ifndef __CRB_CLIENT_H__
-#define __CRB_CLIENT_H__ 1
+#ifndef __HK_CLIENT_H__
+#define __HK_CLIENT_H__ 1
 
 #include <stdint.h>
 
@@ -8,16 +8,16 @@
 #include "hk_ws.h"
 
 typedef enum {
-     CRB_STATE_CONNECTING = 0,
-     CRB_STATE_OPEN,
-     CRB_STATE_CLOSING,
-     CRB_STATE_CLOSED
+     HK_STATE_CONNECTING = 0,
+     HK_STATE_OPEN,
+     HK_STATE_CLOSING,
+     HK_STATE_CLOSED
 } hk_client_state_e;
 
 typedef enum {
-     CRB_DATA_STATE_HANDSHAKE = 0,
-     CRB_DATA_STATE_FRAME,
-     CRB_DATA_STATE_FRAME_FRAGMENT
+     HK_DATA_STATE_HANDSHAKE = 0,
+     HK_DATA_STATE_FRAME,
+     HK_DATA_STATE_FRAME_FRAGMENT
 } hk_client_data_state_e;
 
 typedef struct hk_client_s hk_client_t;
@@ -47,4 +47,4 @@ void hk_client_set_handshake_request(hk_client_t *client, hk_http_request_t *req
 void hk_client_close(hk_client_t *client);
 void hk_client_mark_as_closing(hk_client_t *client);
 
-#endif /* __CRB_CLIENT_H__ */
+#endif /* __HK_CLIENT_H__ */

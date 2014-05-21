@@ -1,5 +1,5 @@
-#ifndef __CRB_BUFFER_H__
-#define __CRB_BUFFER_H__ 1
+#ifndef __HK_BUFFER_H__
+#define __HK_BUFFER_H__ 1
 
 #include <unistd.h>
 
@@ -23,4 +23,4 @@ void hk_buffer_trim_left(hk_buffer_t *buffer);
 void hk_buffer_clear(hk_buffer_t *buffer);
 void hk_buffer_free(hk_buffer_t *buffer);
 
-#endif /* __CRB_BUFFER_H__ */
+#endif /* __HK_BUFFER_H__ */

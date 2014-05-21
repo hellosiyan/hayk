@@ -92,18 +92,18 @@ hk_sender_loop(void *data)
 		
 		if ( task ) {
 			switch(task->type) {
-				case CRB_TASK_SHUTDOWN:
+				case HK_TASK_SHUTDOWN:
 					// break out of the loop
 					sender->running = 0;
 					hk_task_free(task);
 					break;
-				case CRB_TASK_BROADCAST:
+				case HK_TASK_BROADCAST:
 					hk_sender_task_broadcast(task);
 					break;
-				case CRB_TASK_PONG:
+				case HK_TASK_PONG:
 					hk_sender_task_pong(task);
 					break;
-				case CRB_TASK_HANDSHAKE:
+				case HK_TASK_HANDSHAKE:
 					hk_sender_task_handshake(task);
 					break;
 				default: 
@@ -138,7 +138,7 @@ hk_sender_stop(hk_sender_t *sender)
 	}
 	
 	task = hk_task_init();
-	task->type = CRB_TASK_SHUTDOWN;
+	task->type = HK_TASK_SHUTDOWN;
 	
 	pthread_mutex_lock(sender->mu_tasks);
 	hk_sender_add_task(sender, task);
@@ -183,7 +183,7 @@ hk_sender_task_broadcast(hk_task_t *task) {
 		data_offset = 0;
 		data_size = frame->data_length;
 		
-		if ( client->state == CRB_STATE_OPEN /*&& client->sock_fd != task->client->sock_fd*/ ) {
+		if ( client->state == HK_STATE_OPEN /*&& client->sock_fd != task->client->sock_fd*/ ) {
 			bytes_written = write(client->sock_fd, (char*)header, header_length);
 			
 			bytes_written = write(client->sock_fd, frame->data, data_size);
@@ -223,13 +223,13 @@ hk_sender_task_pong(hk_task_t *task) {
 	data_offset = 0;
 	data_size = frame->data_length;
 
-	if ( client->state != CRB_STATE_OPEN ) {
+	if ( client->state != HK_STATE_OPEN ) {
 		hk_ws_frame_free_with_data(frame);
 		hk_task_free(task);
 		return;
 	}
 	
-	header = hk_ws_generate_frame_head(data_size, &header_length, 0, CRB_WS_PONG_FRAME);
+	header = hk_ws_generate_frame_head(data_size, &header_length, 0, HK_WS_PONG_FRAME);
 	if ( header == NULL ) {
 		hk_log_error("Cannot create frame head");
 		
@@ -286,7 +286,7 @@ hk_sender_task_handshake(hk_task_t *task)
 		SHA_CTX sha1;
 		
 		// Compute SHA1
-		key_header = hk_request_get_header(task->client->request, CRB_WS_KEY, -1);
+		key_header = hk_request_get_header(task->client->request, HK_WS_KEY, -1);
 		
 		SHA1_Init(&sha1);
 		SHA1_Update(&sha1, key_header->value, strlen(key_header->value));

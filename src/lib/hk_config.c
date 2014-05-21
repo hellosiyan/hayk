@@ -39,7 +39,7 @@ hk_config_load(hk_config_t *config)
 
 	config_init(&cfg);
 
-	if(! config_read_file(&cfg, CRB_CONFIG)) {
+	if(! config_read_file(&cfg, HK_CONFIG)) {
 		hk_log_error(config_error_text(&cfg));
 		
 		config_destroy(&cfg);

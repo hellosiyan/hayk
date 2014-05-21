@@ -24,7 +24,7 @@
 
 
 #define SERVER_PORT 8080
-#define CRB_WORKER_CHANNELS_SCALE 4
+#define HK_WORKER_CHANNELS_SCALE 4
 
 
 static hk_worker_t *worker_inst;
@@ -54,9 +54,9 @@ hk_worker_create(hk_config_entry_t *config)
 	hk_worker_t * worker;
 	worker = malloc(sizeof(hk_worker_t));
 	
-	worker->state = CRB_WORKER_STOPPED;
+	worker->state = HK_WORKER_STOPPED;
 	
-	worker->channels = hk_hash_init(CRB_WORKER_CHANNELS_SCALE);
+	worker->channels = hk_hash_init(HK_WORKER_CHANNELS_SCALE);
 	worker->readers = hk_list_init();
 	worker->senders = hk_list_init();
 	
@@ -82,7 +82,7 @@ hk_worker_fork_and_run(hk_worker_t * worker)
 {
 	pid_t pid;
 
-	if ( worker->state != CRB_WORKER_STOPPED ) {
+	if ( worker->state != HK_WORKER_STOPPED ) {
 		hk_log_error("Cannot run, worker already running");
 		return 0;
 	}
@@ -106,7 +106,7 @@ hk_worker_run(hk_worker_t * worker)
 {
 	worker_inst = worker;
 
-	if ( worker->state != CRB_WORKER_STOPPED ) {
+	if ( worker->state != HK_WORKER_STOPPED ) {
 		hk_log_error("Cannot run, worker already running");
 		return 0;
 	}
@@ -121,7 +121,7 @@ hk_worker_run(hk_worker_t * worker)
 	struct sockaddr_in address;
 	struct pollfd pfd; 
 	
-	worker->state = CRB_WORKER_INIT;
+	worker->state = HK_WORKER_INIT;
 	
 	hk_reader_t* reader = worker->active_reader;
 	
@@ -134,7 +134,7 @@ hk_worker_run(hk_worker_t * worker)
 	worker->socket_in = sock_desc;
 	if ( sock_desc == -1 ) {
 		perror("socket");
-		worker->state = CRB_WORKER_STOPPED;
+		worker->state = HK_WORKER_STOPPED;
 		exit(EXIT_FAILURE);
 	}
 	
@@ -143,21 +143,21 @@ hk_worker_run(hk_worker_t * worker)
 	result = bind( sock_desc, (struct sockaddr*)&address, sizeof( struct sockaddr_in ) );
 	if ( result == -1 ) {
 		perror("bind");
-		worker->state = CRB_WORKER_STOPPED;
+		worker->state = HK_WORKER_STOPPED;
 		exit(EXIT_FAILURE);
 	}
 	
 	result = listen( sock_desc, 100 );
 	if ( result == -1 ) {
 		perror("listen");
-		worker->state = CRB_WORKER_STOPPED;
+		worker->state = HK_WORKER_STOPPED;
 		exit(EXIT_FAILURE);
 	}
 	
 	flags = fcntl (sock_desc, F_GETFL, 0);
 	if (flags == -1) {
 		perror ("fcntl");
-		worker->state = CRB_WORKER_STOPPED;
+		worker->state = HK_WORKER_STOPPED;
 		exit(EXIT_FAILURE);
 	}
 
@@ -165,16 +165,16 @@ hk_worker_run(hk_worker_t * worker)
 	result = fcntl (sock_desc, F_SETFL, flags);
 	if (result == -1) {
 		perror ("fcntl");
-		worker->state = CRB_WORKER_STOPPED;
+		worker->state = HK_WORKER_STOPPED;
 		exit(EXIT_FAILURE);
 	}
 	
 	pfd.fd = sock_desc;
 	pfd.events = POLLIN | POLLOUT | POLLHUP; 
 	
-	worker->state = CRB_WORKER_RUNNING;
+	worker->state = HK_WORKER_RUNNING;
 	
-	while (worker->state == CRB_WORKER_RUNNING) {
+	while (worker->state == HK_WORKER_RUNNING) {
 		poll(&pfd, 1, -1);
 		new_desc = accept( sock_desc, NULL, NULL);
 		if ( new_desc < 0 ) {
@@ -223,7 +223,7 @@ hk_worker_stop(hk_worker_t * worker)
 		return;
 	}
 	
-	worker->state = CRB_WORKER_STOPPING;
+	worker->state = HK_WORKER_STOPPING;
 	shutdown(worker->socket_in, SHUT_RDWR);
 }
 
@@ -261,7 +261,7 @@ _hk_worker_stop()
 		}
 	}
 	
-	worker->state = CRB_WORKER_STOPPED;
+	worker->state = HK_WORKER_STOPPED;
 	
 	{
 		/* Free channel pool */
@@ -320,7 +320,7 @@ hk_worker_get_channel(char *name, int name_length)
 void
 hk_worker_on_client_connect(hk_client_t *client)
 {
-	client->state = CRB_STATE_CONNECTING;
+	client->state = HK_STATE_CONNECTING;
 	hk_reader_add_client(worker_inst->active_reader, client);
 	
 	/* TODO: remove; begin test code */

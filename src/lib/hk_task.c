@@ -19,7 +19,7 @@ hk_task_init()
     task->data2 = NULL;
     task->prev = NULL;
     
-    task->type = CRB_TASK_NULL;
+    task->type = HK_TASK_NULL;
 
     return task;
 }

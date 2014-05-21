@@ -1,5 +1,5 @@
-#ifndef __CRB_CHANNEL_H__
-#define __CRB_CHANNEL_H__ 1
+#ifndef __HK_CHANNEL_H__
+#define __HK_CHANNEL_H__ 1
 
 #include "hk_client.h"
 #include "hk_hash.h"
@@ -19,4 +19,4 @@ void hk_channel_subscribe(hk_channel_t *channel, hk_client_t *client);
 void hk_channel_unsubscribe(hk_channel_t *channel, hk_client_t *client);
 hk_client_t *hk_channel_client_is_subscribed(hk_channel_t *channel, hk_client_t *client);
 
-#endif /* __CRB_CHANNEL_H__ */
+#endif /* __HK_CHANNEL_H__ */

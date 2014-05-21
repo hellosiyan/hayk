@@ -1,12 +1,12 @@
-#ifndef __CRB_SENDER_H__
-#define __CRB_SENDER_H__ 1
+#ifndef __HK_SENDER_H__
+#define __HK_SENDER_H__ 1
 
 #include <pthread.h>
 #include <semaphore.h>
 
 #include "hk_task.h"
 
-#define CRB_SENDER_MAX_TASKS 10
+#define HK_SENDER_MAX_TASKS 10
 
 typedef struct hk_sender_s hk_sender_t;
 struct hk_sender_s {
@@ -26,4 +26,4 @@ void hk_sender_run(hk_sender_t *sender);
 void hk_sender_stop(hk_sender_t *sender);
 void hk_reader_add_task(hk_sender_t *sender, hk_task_t *task);
 
-#endif /* __CRB_READER_H__ */
+#endif /* __HK_READER_H__ */

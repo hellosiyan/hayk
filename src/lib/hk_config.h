@@ -1,5 +1,5 @@
-#ifndef __CRB_CONFIG_H__
-#define __CRB_CONFIG_H__ 1
+#ifndef __HK_CONFIG_H__
+#define __HK_CONFIG_H__ 1
 
 #include <unistd.h>
 #include <stdint.h>
@@ -11,7 +11,7 @@
 #include "hk_list.h"
 #include "hk_hash.h"
 
-#define CRB_CONFIG PACKAGE_CONF_FILE
+#define HK_CONFIG PACKAGE_CONF_FILE
 
 typedef struct hk_config_entry_s hk_config_entry_t;
 struct hk_config_entry_s {
@@ -33,4 +33,4 @@ hk_config_entry_t * hk_config_entry_init();
 hk_config_t * hk_config_init();
 int hk_config_load(hk_config_t *config);
 
-#endif /* __CRB_CONFIG_H__ */
+#endif /* __HK_CONFIG_H__ */

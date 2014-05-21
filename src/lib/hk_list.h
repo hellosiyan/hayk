@@ -1,5 +1,5 @@
-#ifndef __CRB_LIST_H
-#define __CRB_LIST_H 1
+#ifndef __HK_LIST_H
+#define __HK_LIST_H 1
 
 #include <stdint.h>
 
@@ -29,4 +29,4 @@ void hk_list_item_ref(hk_list_item_t *item);
 void hk_list_item_unref(hk_list_item_t *item);
 
 
-#endif /* __CRB_LIST_H */
+#endif /* __HK_LIST_H */

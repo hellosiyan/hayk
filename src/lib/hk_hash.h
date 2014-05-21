@@ -1,5 +1,5 @@
-#ifndef __CRB_HASH_H
-#define __CRB_HASH_H 1
+#ifndef __HK_HASH_H
+#define __HK_HASH_H 1
 
 #include <stdint.h>
 
@@ -46,4 +46,4 @@ void hk_hash_cursor_free(hk_hash_cursor_t *cursor);
 uint32_t hk_murmurhash3(void * key, int len);
 
 
-#endif /* __CRB_HASH_H */
+#endif /* __HK_HASH_H */

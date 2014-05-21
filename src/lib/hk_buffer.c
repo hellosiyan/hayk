@@ -4,7 +4,7 @@
 
 #include "hk_buffer.h"
 
-#define CRB_BUFFER_PIECE_SIZE 2048
+#define HK_BUFFER_PIECE_SIZE 2048
 
 hk_buffer_t *
 hk_buffer_init(size_t size)
@@ -44,7 +44,7 @@ hk_buffer_copy(hk_buffer_t *orig)
 	
 	buffer->used = orig->used;
 	buffer->size = orig->size;
-	buffer->size += CRB_BUFFER_PIECE_SIZE - (buffer->size%CRB_BUFFER_PIECE_SIZE);
+	buffer->size += HK_BUFFER_PIECE_SIZE - (buffer->size%HK_BUFFER_PIECE_SIZE);
 	
 	buffer->ptr = malloc(buffer->size);
 	if ( buffer->ptr == NULL ) {
@@ -116,7 +116,7 @@ hk_buffer_append_string(hk_buffer_t *buffer, const char *str, size_t str_len)
 	
 	if ( buffer->used + str_len > buffer->size  ) {
 		buffer->size = buffer->used + str_len;
-		buffer->size += CRB_BUFFER_PIECE_SIZE - (buffer->size%CRB_BUFFER_PIECE_SIZE);
+		buffer->size += HK_BUFFER_PIECE_SIZE - (buffer->size%HK_BUFFER_PIECE_SIZE);
 		
 		rpos_offset = buffer->rpos - buffer->ptr;
 		

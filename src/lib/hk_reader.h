@@ -1,5 +1,5 @@
-#ifndef __CRB_READER_H__
-#define __CRB_READER_H__ 1
+#ifndef __HK_READER_H__
+#define __HK_READER_H__ 1
 
 #include <unistd.h>
 #include <stdint.h>
@@ -11,8 +11,8 @@
 #include "hk_hash.h"
 #include "hk_client.h"
 
-#define CRB_READER_CLIENTS_SCALE 4
-#define CRB_READER_EPOLL_MAX_EVENTS 20
+#define HK_READER_CLIENTS_SCALE 4
+#define HK_READER_EPOLL_MAX_EVENTS 20
 
 typedef struct hk_reader_s hk_reader_t;
 struct hk_reader_s {
@@ -33,4 +33,4 @@ void hk_reader_add_client(hk_reader_t *reader, hk_client_t *client);
 void hk_reader_drop_client(hk_reader_t *reader, hk_client_t *client);
 void hk_reader_drop_all_clients(hk_reader_t *reader);
 
-#endif /* __CRB_READER_H__ */
+#endif /* __HK_READER_H__ */

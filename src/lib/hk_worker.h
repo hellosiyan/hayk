@@ -1,5 +1,5 @@
-#ifndef __CRB_WORKER_H__
-#define __CRB_WORKER_H__ 1
+#ifndef __HK_WORKER_H__
+#define __HK_WORKER_H__ 1
 
 #include "hk_hash.h"
 #include "hk_list.h"
@@ -10,10 +10,10 @@
 #include "hk_config.h"
 
 typedef enum {
-     CRB_WORKER_INIT = 0,
-     CRB_WORKER_RUNNING,
-     CRB_WORKER_STOPPING,
-     CRB_WORKER_STOPPED
+     HK_WORKER_INIT = 0,
+     HK_WORKER_RUNNING,
+     HK_WORKER_STOPPING,
+     HK_WORKER_STOPPED
 } hk_worker_state_e;
 
 typedef struct hk_worker_s hk_worker_t;
@@ -48,4 +48,4 @@ void hk_worker_on_client_connect(hk_client_t *client);
 void hk_worker_on_client_disconnect(hk_client_t *client);
 
 
-#endif /* __CRB_WORKER_H__ */
+#endif /* __HK_WORKER_H__ */

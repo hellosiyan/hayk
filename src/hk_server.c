@@ -235,10 +235,10 @@ hk_read_pid()
 	ssize_t bytes_read;
 	pid_t pid;
 	
-	pid_file = open(CRB_PIDFILE,O_RDONLY|O_CREAT,0640);
+	pid_file = open(HK_PIDFILE,O_RDONLY|O_CREAT,0640);
 	
 	if ( pid_file < 0 ) {
-		printf("Unable to open pid file \"%s\"\n", CRB_PIDFILE );
+		printf("Unable to open pid file \"%s\"\n", HK_PIDFILE );
 		exit(EXIT_FAILURE);
 	}
 	
@@ -263,10 +263,10 @@ hk_write_pid()
 	ssize_t bytes_written;
 	pid_t pid = getpid();
 	
-	pid_file = open(CRB_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
+	pid_file = open(HK_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
 	
 	if ( pid_file < 0 ) {
-		printf("Unable to open pid file \"%s\"\n", CRB_PIDFILE );
+		printf("Unable to open pid file \"%s\"\n", HK_PIDFILE );
 		exit(EXIT_FAILURE);
 	}
 	
@@ -284,7 +284,7 @@ void
 hk_clear_pid()
 {
 	int pid_file;
-	pid_file = open(CRB_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
+	pid_file = open(HK_PIDFILE,O_WRONLY|O_CREAT|O_TRUNC,0640);
 	if ( pid_file < 0 ) {
 		return;
 	}

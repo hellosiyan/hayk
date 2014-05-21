@@ -1,15 +1,15 @@
-#ifndef __CRB_TASK_H__
-#define __CRB_TASK_H__ 1
+#ifndef __HK_TASK_H__
+#define __HK_TASK_H__ 1
 
 #include "hk_buffer.h"
 #include "hk_client.h"
 
 typedef enum {
-     CRB_TASK_NULL = 0,
-     CRB_TASK_BROADCAST,
-     CRB_TASK_PONG,
-     CRB_TASK_HANDSHAKE,
-     CRB_TASK_SHUTDOWN
+     HK_TASK_NULL = 0,
+     HK_TASK_BROADCAST,
+     HK_TASK_PONG,
+     HK_TASK_HANDSHAKE,
+     HK_TASK_SHUTDOWN
 } hk_task_type_e;
 
 typedef struct hk_task_s hk_task_t;
@@ -45,4 +45,4 @@ void hk_task_queue_free(hk_task_queue_t *queue);
 void hk_task_queue_push(hk_task_queue_t *queue, hk_task_t *task);
 hk_task_t * hk_task_queue_pop(hk_task_queue_t *queue);
 
-#endif /* __CRB_TASK_H__ */
+#endif /* __HK_TASK_H__ */

@@ -1,5 +1,5 @@
-#ifndef __CRB_LOG_H__
-#define __CRB_LOG_H__ 1
+#ifndef __HK_LOG_H__
+#define __HK_LOG_H__ 1
 
 typedef enum {
      HK_LOG_NONE = 0,
@@ -21,4 +21,4 @@ void hk_log_debug(char *msg);
 void hk_log_error(char *msg);
 void hk_log_mark(char *msg);
 
-#endif /* __CRB_LOG_H__ */
+#endif /* __HK_LOG_H__ */

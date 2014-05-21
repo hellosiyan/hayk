@@ -7,7 +7,7 @@
 #include "hk_ws.h"
 #include "hk_client.h"
 
-#define CRB_READER_BUFFER_SIZE 4096
+#define HK_READER_BUFFER_SIZE 4096
 
 static void hk_client_free(hk_client_t *client);
 
@@ -21,11 +21,11 @@ hk_client_init()
         return NULL;
     }
     
-    client->state = CRB_STATE_CONNECTING;
-    client->data_state = CRB_STATE_CONNECTING;
+    client->state = HK_STATE_CONNECTING;
+    client->data_state = HK_STATE_CONNECTING;
     client->request = NULL;
     
-    client->buffer_in = hk_buffer_init(CRB_READER_BUFFER_SIZE);
+    client->buffer_in = hk_buffer_init(HK_READER_BUFFER_SIZE);
     if ( client->buffer_in == NULL ) {
     	hk_log_error("Cannot allocate client buffer");
     	free(client);
@@ -33,7 +33,7 @@ hk_client_init()
     }
 
 	client->fragmented_frame = NULL;
-	client->fragmented_data = hk_buffer_init(CRB_READER_BUFFER_SIZE);
+	client->fragmented_data = hk_buffer_init(HK_READER_BUFFER_SIZE);
 	if ( client->fragmented_data == NULL ) {
     	hk_log_error("Cannot allocate fragment data buffer");
     	free(client);
@@ -117,11 +117,11 @@ hk_client_unref(hk_client_t *client)
 void 
 hk_client_mark_as_closing(hk_client_t *client) 
 {
-	if ( client == NULL || client->state == CRB_STATE_CLOSED || client->state == CRB_STATE_CLOSING ) {
+	if ( client == NULL || client->state == HK_STATE_CLOSED || client->state == HK_STATE_CLOSING ) {
 		return;
 	}
 	
-	client->state = CRB_STATE_CLOSING;
+	client->state = HK_STATE_CLOSING;
 }
 
 void 
@@ -130,18 +130,18 @@ hk_client_close(hk_client_t *client)
 	uint8_t *close_frame;
 	int close_frame_length;
 
-	if ( client == NULL || client->state == CRB_STATE_CLOSED ) {
+	if ( client == NULL || client->state == HK_STATE_CLOSED ) {
 		return;
 	}
 	
-	client->state = CRB_STATE_CLOSING;
+	client->state = HK_STATE_CLOSING;
 
 	close_frame = hk_ws_generate_close_frame(&close_frame_length, 0);
 
 	write(client->sock_fd, (char*)close_frame, close_frame_length);
 	close(client->sock_fd);
 
-	client->state = CRB_STATE_CLOSED;
+	client->state = HK_STATE_CLOSED;
 
 	free(close_frame);
 	hk_log_info("Closed client");
