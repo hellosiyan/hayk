@@ -62,8 +62,6 @@ hk_hash_free(hk_hash_t *hash)
 	hk_hash_item_t *tmp_item;
 	hk_hash_item_t *new_item;
 	
-	// hk_hash_item_t **items;
-	
 	for (col = 0; col < hash->scale; col += 1) {
 		tmp_item = hash->items[col];
 		while ( tmp_item != NULL ) {
@@ -257,7 +255,6 @@ hk_hash_cursor_next(hk_hash_cursor_t *cursor)
 			}
 			tmp_item = cursor->row->next;
 			data = cursor->row->data;
-			//hk_hash_item_unref(cursor->row);
 			cursor->row = tmp_item;
 			return data;
 		}

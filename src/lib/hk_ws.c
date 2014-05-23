@@ -249,10 +249,6 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 		
 		read_pos = read_pos + 10; 
 	} else {
-		// // Hayk specific
-		// if ( frame->payload_len < 4 && frame->opcode == HK_WS_TEXT_FRAME ) {
-		// 	return HK_PARSE_INCOMPLETE;
-		// }
 		read_pos = read_pos + 2; 
 	}
 	

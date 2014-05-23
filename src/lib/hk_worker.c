@@ -250,7 +250,7 @@ _hk_worker_stop()
 		hk_list_item_t *item;
 		hk_sender_t *sender;
 		
-		sender = (hk_sender_t *) hk_list_pop(worker->senders); // worker->senders->first;
+		sender = (hk_sender_t *) hk_list_pop(worker->senders);
 		while ( sender != NULL ) {
 			hk_sender_stop(sender);
 			hk_sender_free(sender);
