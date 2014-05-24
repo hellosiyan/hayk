@@ -5,11 +5,11 @@
 #include "hk_crypt.h"
 
 int
-hk_encode_base64(u_char *dst, u_char *src, int src_length)
+hk_encode_base64(unsigned char *dst, unsigned char *src, int src_length)
 {
-    u_char *d, *s;
+    unsigned char *d, *s;
     size_t len;
-    static u_char basis64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static unsigned char basis64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     len = src_length;
     s = src;

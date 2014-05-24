@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -105,6 +106,8 @@ hk_parse_command_arg(char *command)
 	}
 	
 	hk_print_help_and_exit();
+	
+	return HK_SERVER_STOP;
 }
 
 

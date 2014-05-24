@@ -13,6 +13,7 @@
 #include "hk_sender.h"
 #include "hk_task.h"
 #include "hk_ws.h"
+#include "hk_log.h"
 
 static void hk_sender_task_broadcast(hk_task_t *task);
 static void hk_sender_task_pong(hk_task_t *task);
@@ -77,13 +78,12 @@ hk_sender_loop(void *data)
 {
 	hk_sender_t *sender;
 	hk_task_t *task;
-	int result;
 	
 	sender = (hk_sender_t *) data;
 	
 	sender->running = 1;
 	while (sender->running) {
-		result = sem_wait(&sender->sem_tasks);
+		sem_wait(&sender->sem_tasks);
 		
 		pthread_mutex_lock(sender->mu_tasks);
 		task = hk_task_queue_pop(sender->tasks);
@@ -277,7 +277,7 @@ hk_sender_task_handshake(hk_task_t *task)
 	/* Calculate Sec-WebSocket-Accept */
 	{
 		hk_http_header_t *key_header;
-		char ws_sha1[SHA_DIGEST_LENGTH];
+		unsigned char ws_sha1[SHA_DIGEST_LENGTH];
 		char *ws_base64;
 		int ws_base64_length = 0;
 		SHA_CTX sha1;
@@ -288,7 +288,7 @@ hk_sender_task_handshake(hk_task_t *task)
 		SHA1_Init(&sha1);
 		SHA1_Update(&sha1, key_header->value, strlen(key_header->value));
 		SHA1_Update(&sha1, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
-		SHA1_Final(ws_sha1, &sha1);
+		SHA1_Final((unsigned char *) ws_sha1, &sha1);
 		
 		// Compute Base64
 		ws_base64_length = (((SHA_DIGEST_LENGTH + 2) / 3) * 4);
@@ -299,7 +299,7 @@ hk_sender_task_handshake(hk_task_t *task)
 			return;
 		}
 		
-		ws_base64_length = hk_encode_base64(ws_base64, ws_sha1, SHA_DIGEST_LENGTH);
+		ws_base64_length = hk_encode_base64((unsigned char *) ws_base64, ws_sha1, SHA_DIGEST_LENGTH);
 		
 		hk_request_add_header(request, "Sec-WebSocket-Accept", -1, ws_base64, ws_base64_length);
 		free(ws_base64);

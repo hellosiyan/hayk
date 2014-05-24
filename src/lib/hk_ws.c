@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include "hk_ws.h"
 #include "hk_buffer.h"
+#include "hk_log.h"
 
 #define hk_strcmp2(s, c0, c1) \
     s[0] == c0 && s[1] == c1
@@ -45,16 +47,17 @@ hk_ws_frame_init()
 uint8_t *
 hk_ws_generate_frame_head(uint64_t data_length, int *head_length, int masked, uint8_t opcode)
 {
-	uint8_t *pos, *frame_data;
-	uint64_t payload_len;
+	uint8_t *write_position, *frame_data;
+	uint64_t payload_lenth;
 	int is_masked;
+
 	union {
 		uint32_t raw;
 		uint8_t octets[4];
 	} mask;
 		
 	// define frame properties 
-	payload_len = data_length;
+	payload_lenth = data_length;
 	
 	if ( masked ) {
 		is_masked = 1;
@@ -66,9 +69,9 @@ hk_ws_generate_frame_head(uint64_t data_length, int *head_length, int masked, ui
 	// define data length
 	*head_length = 2;
 	
-	if ( payload_len < 126 ) {
+	if ( payload_lenth < 126 ) {
 		// pass
-	} else if (payload_len < 65536 ) {
+	} else if (payload_lenth < 65536 ) {
 		*head_length += 2;
 	} else {
 		*head_length += 8;
@@ -83,36 +86,36 @@ hk_ws_generate_frame_head(uint64_t data_length, int *head_length, int masked, ui
 		return NULL;
 	}
 	
-	pos = frame_data;
+	write_position = frame_data;
 	
 	// Opcode, rsv, fin
-	*pos = (opcode&15) | 0b10000000;
-	pos += 1;
+	*write_position = (opcode&15) | 0b10000000;
+	write_position += 1;
 	
 	// Payload length
-	if ( payload_len < 126 ) {
-		*pos = (payload_len&127) | (is_masked << 7);
-	} else if (payload_len < 65536 ) {
-		*pos = 126 | (is_masked << 7);
-		pos += 1;
-		*(uint16_t*)pos = htons(payload_len);
-		pos += 2;
+	if ( payload_lenth < 126 ) {
+		*write_position = (payload_lenth&127) | (is_masked << 7);
+	} else if (payload_lenth < 65536 ) {
+		*write_position = 126 | (is_masked << 7);
+		write_position += 1;
+
+		*(uint16_t*)write_position = htons(payload_lenth);
+		write_position += 2;
 	} else {
-		*pos = 127 | (is_masked << 7);
-		pos += 1;
+		*write_position = 127 | (is_masked << 7);
+		write_position += 1;
 
-		*((uint64_t*)pos) = ntohl((uint32_t)payload_len);
-		*((uint64_t*)pos) <<= 32;
-		*((uint64_t*)pos) += ntohl( * (((uint32_t *) (&payload_len))+1) );
-
-		pos += 8;
+		*((uint64_t*)write_position) = ntohl((uint32_t)payload_lenth);
+		*((uint64_t*)write_position) <<= 32;
+		*((uint64_t*)write_position) += ntohl( * (((uint32_t *) (&payload_lenth))+1) );
+		write_position += 8;
 	}
 	
 	// Mask key
 	
 	if ( is_masked ) {
-		*((uint32_t*)pos) = mask.raw;
-		pos += 4;
+		*((uint32_t*)write_position) = mask.raw;
+		write_position += 4;
 	}
 	
 	return frame_data;
@@ -121,15 +124,14 @@ hk_ws_generate_frame_head(uint64_t data_length, int *head_length, int masked, ui
 uint8_t *
 hk_ws_generate_close_frame(int *frame_length, int masked)
 {
-	uint8_t *pos, *data;
-	
-	uint64_t payload_len;
+	uint8_t *write_position, *frame;
 	uint8_t opcode;
+	int is_masked;
+
 	union {
 		uint32_t raw;
 		uint8_t octets[4];
 	} mask;
-	int is_masked;
 	
 	// define frame properties 
 	opcode = HK_WS_CLOSE_FRAME;
@@ -148,27 +150,27 @@ hk_ws_generate_close_frame(int *frame_length, int masked)
 		 *frame_length += 4;
 	}
 	
-	data = malloc(*frame_length * sizeof(uint8_t));
-	if ( data == NULL ) {
+	frame = malloc(*frame_length * sizeof(uint8_t));
+	if ( frame == NULL ) {
 		return NULL;
 	}
 	
-	pos = data;
+	write_position = frame;
 	
 	// Opcode, rsv, fin
-	*pos = (opcode&15) | 0b10000000;
-	pos += 1;
+	*write_position = (opcode&15) | 0b10000000;
+	write_position += 1;
 	
 	// Payload length
-	*pos = 0 | (is_masked << 7);
+	*write_position = 0 | (is_masked << 7);
 	
 	// Mask key
 	if ( is_masked ) {
-		*((uint32_t*)pos) = mask.raw;
-		pos += 4;
+		*((uint32_t*)write_position) = mask.raw;
+		write_position += 4;
 	}
 	
-	return data;
+	return frame;
 }
 
 
@@ -209,7 +211,7 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	frame->is_fin = (raw&128)>>7;
 	
 	// Mask
-	if ( raw & 256 == 0 ) {
+	if ( (raw & 256) == 0 ) {
 		frame->is_masked = 0; 
 	} else {
 		frame->is_masked = 1; 

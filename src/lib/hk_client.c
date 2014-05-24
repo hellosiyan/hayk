@@ -6,6 +6,7 @@
 #include "hk_atomic.h"
 #include "hk_ws.h"
 #include "hk_client.h"
+#include "hk_log.h"
 
 #define HK_READER_BUFFER_SIZE 4096
 

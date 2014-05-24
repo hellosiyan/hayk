@@ -7,6 +7,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 
@@ -17,6 +18,7 @@
 #include "hk_task.h"
 #include "hk_request.h"
 #include "hk_ws.h"
+#include "hk_log.h"
 
 
 #define hk_strcmp2(s, c0, c1) \
@@ -32,9 +34,8 @@
 static void hk_reader_on_data(hk_reader_t *reader, hk_client_t *client);
 static int hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffer);
 static int hk_reader_validate_handshake_request(hk_http_request_t *request);
-static int hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
-static int hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
-static hk_list_t * hk_reader_parse_control_frame(hk_ws_frame_t *frame);
+static void hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
+static void hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
 
 hk_reader_t *
 hk_reader_init()
@@ -72,12 +73,14 @@ hk_reader_free(hk_reader_t *reader)
 static void* 
 hk_reader_loop(void *data)
 {
-	int n,i,ci, chars_read;
+	int i, chars_read;
 	struct epoll_event *events;
+	int events_count;
 	hk_reader_t *reader;
 	hk_client_t *client;
-	char *buf[4096];
-	buf[4095] = '\0';
+	char *read_buffer[1025];
+
+	read_buffer[1024] = '\0';
 	
 	reader = (hk_reader_t *) data;
 	events = calloc (HK_READER_EPOLL_MAX_EVENTS, sizeof (struct epoll_event));
@@ -88,9 +91,9 @@ hk_reader_loop(void *data)
 
 	reader->running = 1;
 	while(reader->running) {
-		n = epoll_wait (reader->epoll_fd, events, HK_READER_EPOLL_MAX_EVENTS, 250);
+		events_count = epoll_wait (reader->epoll_fd, events, HK_READER_EPOLL_MAX_EVENTS, 250);
 		
-		for (i = 0; i < n; i += 1) {
+		for (i = 0; i < events_count; i += 1) {
 			if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (events[i].events & EPOLLRDHUP) || (!(events[i].events & EPOLLIN))) {
 				/* Client closed or error occured */
 				hk_log_debug("Client closed connection");
@@ -101,15 +104,15 @@ hk_reader_loop(void *data)
 			} else if (events[i].events & EPOLLIN) {
 				client = (hk_client_t *) events[i].data.ptr;
 				
-				chars_read = read(client->sock_fd, buf, 1024);
+				chars_read = read(client->sock_fd, read_buffer, 1024);
 				
 				if ( chars_read == 0 ) {
 					continue;
 				}
 
 				while ( chars_read > 0 ) {
-					hk_buffer_append_string(client->buffer_in, (const char*)buf, chars_read);
-					chars_read = read(client->sock_fd, buf, 1024);
+					hk_buffer_append_string(client->buffer_in, (const char*)read_buffer, chars_read);
+					chars_read = read(client->sock_fd, read_buffer, 1024);
 				}
 
 				hk_reader_on_data(reader, client);
@@ -152,7 +155,7 @@ void
 hk_reader_add_client(hk_reader_t *reader, hk_client_t *client)
 {
 	struct epoll_event event;
-	int result;
+	int epoll_error;
 	
 	client->id = hk_atomic_add_fetch( &(reader->cid), 1 );
 	
@@ -161,8 +164,8 @@ hk_reader_add_client(hk_reader_t *reader, hk_client_t *client)
 	event.data.ptr = client;
 	event.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP;
 	
-	result = epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
-	if ( result == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
+	epoll_error = epoll_ctl (reader->epoll_fd, EPOLL_CTL_ADD, client->sock_fd, &event);
+	if ( epoll_error == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
 		hk_log_error("Cannot add client to epoll - not enough memory");
 	}
 }
@@ -171,10 +174,10 @@ void
 hk_reader_drop_client(hk_reader_t *reader, hk_client_t *client)
 {
 	hk_worker_on_client_disconnect(client);
-	int result;
+	int epoll_error;
 	
-	result = epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
-	if ( result == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
+	epoll_error = epoll_ctl (reader->epoll_fd, EPOLL_CTL_DEL, client->sock_fd, NULL);
+	if ( epoll_error == -1 && (errno == ENOMEM || errno == ENOSPC) ) {
 		hk_log_error("Cannot add client to epoll - not enough memory");
 	}
 	
@@ -345,76 +348,78 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 static int
 hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffer)
 {
-	char c, ch, *p, *last;
-	char *left, *right, *header_name;
-	int is_crlf = 0, trailing_ws = 0;
-	size_t header_name_length;
+	char read_char_lowercase, read_char, *read_position, *last_position;
+	char *current_position;
+	char *left_marker_position = NULL;
+	char *header_name = NULL;
+	int is_crlf = 0, trailing_whitespaces_count = 0;
+	size_t header_name_length = 0;
 	
     enum {
         sw_start = 0,
-        sw_method,					// 1
-        sw_spaces_before_uri,		// 2
-        sw_after_slash_in_uri,		// 3
-        sw_spaces_before_http,		// 4
-        sw_http,					// 5
-        sw_header_name,				// 6
-        sw_header_separator,		// 7
-        sw_header_crlf,				// 8
-        sw_header_lws,				// 9
-        sw_header_value,			// 10
+        sw_method,
+        sw_spaces_before_uri,
+        sw_after_slash_in_uri,
+        sw_spaces_before_http,
+        sw_http,
+        sw_header_name,
+        sw_header_separator,
+        sw_header_crlf,
+        sw_header_lws,
+        sw_header_value,
     } state;
     
     state = sw_start;
-    last = buffer->ptr + buffer->used;
+    last_position = buffer->ptr + buffer->used;
     
-    if ( buffer->rpos >= last ) {
+    if ( buffer->rpos >= last_position ) {
     	return HK_PARSE_INCOMPLETE;
     }
     
-    for (; buffer->rpos < last; buffer->rpos++) {
-    	p = buffer->rpos;
-    	ch = *p;
+    for (; buffer->rpos < last_position; buffer->rpos++) {
+    	read_position = buffer->rpos;
+    	read_char = *read_position;
     	
     	switch(state) {
     		case sw_start:
-    			left = p;
+    			left_marker_position = read_position;
     			
-		        if (ch == '\n' || ch == '\r' || ch == 0) {
+		        if (read_char == '\n' || read_char == '\r' || read_char == 0) {
 		            break;
 		        }
 
-		        if (ch < 'A' || ch > 'Z') {
+		        if (read_char < 'A' || read_char > 'Z') {
 		            return HK_ERROR_INVALID_METHOD;
 		        }
 
 		        state = sw_method;
 		        break;
     		case sw_method:
-    			if ( ch == ' ' ) {
-    				if (p - left == 3 && hk_strcmp3(left, 'G', 'E', 'T')) {
+    			if ( read_char == ' ' ) {
+    				if (read_position - left_marker_position == 3 && hk_strcmp3(left_marker_position, 'G', 'E', 'T')) {
 				        state = sw_spaces_before_uri;
 				        break;
     				}
     				
 					return HK_ERROR_INVALID_METHOD;
-    			} else if( ch < 'A' || ch > 'Z' ) {
+    			} else if( read_char < 'A' || read_char > 'Z' ) {
 	        		// Method name must be GET
 					return HK_ERROR_INVALID_METHOD;
     			}
     			break;
     		case sw_spaces_before_uri:
-		        if (ch == '/') {
-		            left = p;
+		        if (read_char == '/') {
+		            left_marker_position = read_position;
 		            state = sw_after_slash_in_uri;
 		            break;
 		        }
 
-		        c = (char) (ch | 0x20);
-		        if (c >= 'a' && c <= 'z') {
+		        read_char_lowercase = (char) (read_char | 0x20);
+		        if (read_char_lowercase >= 'a' && read_char_lowercase <= 'z') {
 		            break;
 		        }
 
-		        switch (ch) {
+		        switch (read_char) {
 				    case ' ':
 				        break;
 				    default:
@@ -424,11 +429,11 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 		        break;
 		        
 			case sw_after_slash_in_uri:
-		        switch (ch) {
+		        switch (read_char) {
 				    case ' ':
-				        right = p;
+				        current_position = read_position;
 				        
-				        hk_request_set_uri(request, left, right-left);
+				        hk_request_set_uri(request, left_marker_position, current_position - left_marker_position);
 				        state = sw_spaces_before_http;
 				        break;
 				    case '\n':
@@ -438,9 +443,9 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 		        }
 		        break;
 			case sw_spaces_before_http:
-				switch(ch) {
+				switch(read_char) {
 					case 'H':
-						left = p;
+						left_marker_position = read_position;
 						state = sw_http;
 						break;
 					case ' ':
@@ -450,16 +455,16 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 				}
 		    	break;
 		    case sw_http:
-		    	switch(ch) {
+		    	switch(read_char) {
 					case 'H':
 					case 'T':
 					case 'P':
 					case '/':
 					case '1':
 					case '.':
-						if ( p - left == 7 && hk_strcmp8(left, 'H', 'T', 'T', 'P', '/', '1', '.', '1') ) {
+						if ( read_position - left_marker_position == 7 && hk_strcmp8(left_marker_position, 'H', 'T', 'T', 'P', '/', '1', '.', '1') ) {
 							state = sw_header_crlf;
-						} else if ( p - left > 7 ) {
+						} else if ( read_position - left_marker_position > 7 ) {
 							return HK_ERROR_INVALID_REQUEST;
 						}
 						break;
@@ -469,8 +474,8 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 		    	}
 		    	break;
 		    case sw_header_crlf:
-		    	trailing_ws = 0;
-    			switch(ch) {
+		    	trailing_whitespaces_count = 0;
+    			switch(read_char) {
     				case '\r':
     				case '\n':
     					break;
@@ -479,14 +484,14 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     					state = sw_header_lws;
     					break;
     				default:
-    					left = p;
+    					left_marker_position = read_position;
     					state = sw_header_name;
     					break;
     			}
     			break;
 		    case sw_header_lws:
-		    	trailing_ws = 0;
-    			switch(ch) {
+		    	trailing_whitespaces_count = 0;
+    			switch(read_char) {
     				case '\r':
     					break;
     				case '\n':
@@ -503,13 +508,13 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
     					break;
     				default:
     					is_crlf = 0;
-    					left = p;
+    					left_marker_position = read_position;
     					state = sw_header_name;
     					break;
     			}
     			break;
 		    case sw_header_name:
-    			switch(ch) {
+    			switch(read_char) {
     				case '(':
     				case ')':
     				case '<':
@@ -535,18 +540,18 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 					    return HK_ERROR_INVALID_REQUEST;
     				case ':':
     					// end of name
-    					right = p;
-    					header_name = left;
-    					header_name_length = right-left;
+    					current_position = read_position;
+    					header_name = left_marker_position;
+    					header_name_length = current_position - left_marker_position;
     					
 				        state = sw_header_separator;
 				        break;
 				    default:
-				    	*(buffer->rpos) = toupper(ch);
+				    	*(buffer->rpos) = toupper(read_char);
     			}
     			break;
 		    case sw_header_separator:
-    			switch(ch) {
+    			switch(read_char) {
     				case ' ':
     				case '\t':
     					break;
@@ -557,48 +562,48 @@ hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffe
 				        state = sw_header_lws;
     					break;
     				default:
-    					left = p;
+    					left_marker_position = read_position;
     					state = sw_header_value;
     					break;
     			}
     			break;
 		    case sw_header_value:
-    			switch(ch) {
+    			switch(read_char) {
     				case '\r':
-    					trailing_ws++;
+    					trailing_whitespaces_count++;
     					break;
     				case '\n':
 						if(is_crlf) {
-							right = p - trailing_ws;
-							trailing_ws = 0;
+							current_position = read_position - trailing_whitespaces_count;
+							trailing_whitespaces_count = 0;
 						    
-						    hk_request_add_header(request, header_name, header_name_length, left, right-left);
+						    hk_request_add_header(request, header_name, header_name_length, left_marker_position, current_position - left_marker_position);
 							return HK_PARSE_DONE;
 						} else {
     						is_crlf = 1;
 						}
-    					trailing_ws++;
+    					trailing_whitespaces_count++;
     					break;
     				case ' ':
     				case '\t':
     					if ( is_crlf ) {
     						// lws
     						is_crlf = 0;
-    						trailing_ws = 0;
+    						trailing_whitespaces_count = 0;
     					}
     					break;
     				default:
     					if ( is_crlf ) {
     						is_crlf = 0;
-							right = p-trailing_ws;
-							trailing_ws = 0;
+							current_position = read_position - trailing_whitespaces_count;
+							trailing_whitespaces_count = 0;
 							
-						    if ( right-left > 0 ) {
-						    	hk_request_add_header(request, header_name, header_name_length, left, right-left);
+						    if ( current_position - left_marker_position > 0 ) {
+						    	hk_request_add_header(request, header_name, header_name_length, left_marker_position, current_position - left_marker_position);
 						    } else {
 								hk_request_add_header(request, header_name, header_name_length, NULL, 0);
 						    }
-						    left = p;
+						    left_marker_position = read_position;
 						    state = sw_header_name;
     					}
     					break;
@@ -652,7 +657,7 @@ hk_reader_validate_handshake_request(hk_http_request_t *request)
 	return HK_VALIDATE_DONE;
 }
 
-static int
+static void
 hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
 {
 	hk_task_t *task;
@@ -666,7 +671,7 @@ hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_fram
 	hk_worker_queue_task(task);
 }
 
-static int
+static void
 hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
 {
 	hk_task_t *task;
@@ -679,116 +684,3 @@ hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_fram
 
 	hk_worker_queue_task(task);
 }
-
-static hk_list_t *
-hk_reader_parse_control_frame(hk_ws_frame_t *frame)
-{
-	char * pos;
-	char c, ch, *last;
-	char *left, *right, *header_name;
-	size_t header_name_length;
-    
-    hk_list_t *commands;
-    hk_http_header_t *tmp_header;
-	
-    enum {
-        sw_start = 0,				// 1
-        sw_header_name,				// 2
-        sw_header_separator,		// 3
-        sw_header_value,			// 5
-    } state;
-    
-    commands = hk_list_init();
-    
-    frame = frame;
-    
-    state = sw_start;
-    last = frame->data + frame->data_length;
-    
-    for (pos = frame->data; pos < last; pos++) {
-    	ch = *pos;
-    	
-    	switch(state) {
-    		case sw_start:
-    			left = pos;
-    			
-		        if (ch == '\n' || ch == '\r' || ch == 0) {
-		            break;
-		        }
-
-		        if (ch < 'A' || ch > 'Z') {
-		            return commands;
-		        }
-
-		        state = sw_header_name;
-		        break;
-		    case sw_header_name:
-    			switch(ch) {
-    				case '(': case ')':
-    				case '<': case '>':
-    				case '@': case ',':
-    				case ';': case '\\':
-    				case '"': case '/':
-    				case '[': case ']':
-    				case '?': case '=':
-    				case '{': case '}':
-    				case '\r': case '\n':
-    				case ' ': case '\t':
-    					// separators, not allowed in header name token
-					    return commands;
-    				case ':':
-    					// end of name
-    					right = pos;
-    					header_name = left;
-    					header_name_length = right-left;
-					    
-				        state = sw_header_separator;
-				        break;
-				    default:
-				    	*(pos) = toupper(ch);
-    			}
-    			break;
-		    case sw_header_separator:
-    			switch(ch) {
-    				case ' ':
-    				case '\t':
-    				case '\r':
-    				case '\n':
-    					break;
-    				default:
-    					left = pos;
-    					state = sw_header_value;
-    					break;
-    			}
-    			break;
-		    case sw_header_value:
-    			switch(ch) {
-    				case '\n':
-						right = pos;
-					    
-					    tmp_header = hk_header_init();
-					    
-					    tmp_header->name = malloc(header_name_length+1);
-					    memcpy(tmp_header->name, header_name, header_name_length);
-					    tmp_header->name[header_name_length] = '\0';
-					    
-					    tmp_header->value = malloc(right-left+1);
-					    memcpy(tmp_header->value, left, right-left);
-					    tmp_header->value[right-left] = '\0';
-					    
-					    hk_list_push(commands, tmp_header);
-					    
-					    left = pos + 1;
-					    state = sw_header_name;
-    					break;
-    				default:
-    					break;
-    			}
-    			break;
-    	}
-	}
-	
-	return commands;
-}
-
-

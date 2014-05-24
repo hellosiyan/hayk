@@ -24,6 +24,6 @@ void hk_sender_free(hk_sender_t *sender);
 
 void hk_sender_run(hk_sender_t *sender);
 void hk_sender_stop(hk_sender_t *sender);
-void hk_reader_add_task(hk_sender_t *sender, hk_task_t *task);
+void hk_sender_add_task(hk_sender_t *sender, hk_task_t *task);
 
 #endif /* __HK_READER_H__ */

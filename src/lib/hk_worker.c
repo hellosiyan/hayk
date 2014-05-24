@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/epoll.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <signal.h>
 #include <poll.h>
@@ -20,6 +22,7 @@
 #include "hk_sender.h"
 #include "hk_hash.h"
 #include "hk_list.h"
+#include "hk_log.h"
 
 
 #define SERVER_PORT 8080
@@ -95,7 +98,7 @@ hk_worker_fork_and_run(hk_worker_t * worker)
 	
 	hk_worker_signals_init();
 
-	hk_worker_run(worker);
+	return hk_worker_run(worker);
 }
 
 int 
@@ -119,8 +122,6 @@ hk_worker_run(hk_worker_t * worker)
 	struct pollfd pfd; 
 	
 	worker->state = HK_WORKER_INIT;
-	
-	hk_reader_t* reader = worker->active_reader;
 	
 	// listen address
 	address.sin_family = AF_INET;
@@ -209,9 +210,11 @@ hk_worker_run(hk_worker_t * worker)
  	if ( worker->is_forked ) {
  		exit(0);
  	}
+
+ 	return 0;
 }
 
-int 
+void 
 hk_worker_stop(hk_worker_t * worker)
 {
 	if ( worker != NULL && worker->is_forked && worker->pid != 0 ) {
@@ -234,7 +237,6 @@ _hk_worker_stop()
 	
 	{
 		/* Stop and close readers */
-		hk_list_item_t *item;
 		hk_reader_t *reader;
 	
 		reader = (hk_reader_t *) hk_list_pop(worker->readers);
@@ -247,7 +249,6 @@ _hk_worker_stop()
 	
 	{
 		/* Stop and close senders */
-		hk_list_item_t *item;
 		hk_sender_t *sender;
 		
 		sender = (hk_sender_t *) hk_list_pop(worker->senders);

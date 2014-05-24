@@ -5,6 +5,6 @@
 #include <stdlib.h>
 #include <openssl/sha.h>
 
-int hk_encode_base64(u_char *dst, u_char *src, int src_length);
+int hk_encode_base64(unsigned char *dst, unsigned char *src, int src_length);
 
 #endif /* __HK_CRYPT_H__ */

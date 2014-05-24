@@ -7,6 +7,7 @@
 #include "hk_config.h"
 #include "hk_list.h"
 #include "hk_hash.h"
+#include "hk_log.h"
 
 static int hk_config_parse_group(config_setting_t *group, hk_config_entry_t *config);
 

@@ -35,7 +35,7 @@ struct hk_worker_s {
 hk_worker_t * hk_worker_create(hk_config_entry_t *config);
 int hk_worker_fork_and_run(hk_worker_t * worker);
 int hk_worker_run(hk_worker_t * worker);
-int hk_worker_stop(hk_worker_t * worker);
+void hk_worker_stop(hk_worker_t * worker);
 void hk_worker_queue_task();
 hk_worker_t *hk_worker_get();
 

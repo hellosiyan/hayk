@@ -32,8 +32,6 @@ hk_hash_t *
 hk_hash_init(size_t scale)
 {
     hk_hash_t *hash;
-    hk_hash_item_t *tmp;
-    int i;
 
     hash = malloc(sizeof(hk_hash_t));
     if (hash == NULL) {
@@ -183,7 +181,6 @@ void *
 hk_hash_exists_key(hk_hash_t *hash, void *key, int key_len)
 {
 	uint32_t hash_key;
-	hk_hash_item_t *new_item;
 	hk_hash_item_t *tmp_item;
 	
 	hash_key = hk_murmurhash3(key, key_len);

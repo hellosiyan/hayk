@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -45,9 +47,9 @@ hk_log_init(hk_log_level_e level, hk_log_destination_e destination, const char *
 }
 
 void
-hk_log_info(char *msg)
+hk_log_info(const char *msg)
 {
-	if ( log_level & HK_LOG_INFO == 0) {
+	if ( (log_level & HK_LOG_INFO) == 0) {
 		return;
 	}
 
@@ -62,9 +64,9 @@ hk_log_info(char *msg)
 }
 
 void
-hk_log_debug(char *msg)
+hk_log_debug(const char *msg)
 {
-	if ( log_level & HK_LOG_DEBUG == 0) {
+	if ( (log_level & HK_LOG_DEBUG) == 0) {
 		return;
 	}
 
@@ -79,9 +81,9 @@ hk_log_debug(char *msg)
 }
 
 void
-hk_log_error(char *msg)
+hk_log_error(const char *msg)
 {
-	if ( log_level & HK_LOG_DEBUG == 0) {
+	if ( (log_level & HK_LOG_DEBUG) == 0) {
 		return;
 	}
 
@@ -96,13 +98,13 @@ hk_log_error(char *msg)
 }
 
 void
-hk_log_mark(char *msg)
+hk_log_mark(const char *msg)
 {
 	char *mark;
 	time_t mark_time;
 
 	// marks should appear only in log files
-	if ( log_level & HK_LOG_MARK == 0 || log_destination & HK_LOG_FILE == 0) {
+	if ( (log_level & HK_LOG_MARK) == 0 || (log_destination & HK_LOG_FILE) == 0) {
 		return;
 	}
 	

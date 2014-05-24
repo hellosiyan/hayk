@@ -16,9 +16,9 @@ typedef enum {
 } hk_log_destination_e;
 
 int hk_log_init(hk_log_level_e level, hk_log_destination_e destination, const char *file_path);
-void hk_log_info(char *msg);
-void hk_log_debug(char *msg);
-void hk_log_error(char *msg);
-void hk_log_mark(char *msg);
+void hk_log_info(const char *msg);
+void hk_log_debug(const char *msg);
+void hk_log_error(const char *msg);
+void hk_log_mark(const char *msg);
 
 #endif /* __HK_LOG_H__ */
