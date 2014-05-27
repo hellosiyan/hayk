@@ -211,7 +211,7 @@ hk_ws_frame_parse_buffer(hk_ws_frame_t *frame, hk_buffer_t *buffer)
 	frame->is_fin = (raw&128)>>7;
 	
 	// Mask
-	if ( (raw & 256) == 0 ) {
+	if ( ((raw >> 7) & 256) == 0 ) {
 		frame->is_masked = 0; 
 	} else {
 		frame->is_masked = 1; 
