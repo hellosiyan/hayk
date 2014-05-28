@@ -15,8 +15,8 @@
 #include "hk_atomic.h"
 #include "hk_reader.h"
 #include "hk_buffer.h"
-#include "hk_task.h"
 #include "hk_request.h"
+#include "hk_crypt.h"
 #include "hk_ws.h"
 #include "hk_log.h"
 
@@ -34,8 +34,9 @@
 static void hk_reader_on_data(hk_reader_t *reader, hk_client_t *client);
 static int hk_reader_parse_handshake_request(hk_http_request_t *request, hk_buffer_t *buffer);
 static int hk_reader_validate_handshake_request(hk_http_request_t *request);
-static void hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
-static void hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame);
+static void hk_reader_handle_data_frame(hk_client_t *client, hk_ws_frame_t *incoming_frame, void *user_data);
+static void hk_reader_handle_ping_frame(hk_client_t *client, hk_ws_frame_t *incoming_frame);
+static void hk_reader_handle_handshake(hk_client_t *client);
 
 hk_reader_t *
 hk_reader_init()
@@ -243,16 +244,11 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 				}
 				
 				// Send handshake response
-				hk_task_t *task;
-				task = hk_task_init();
-				hk_task_set_client(task, client);
-				hk_task_set_type(task, HK_TASK_HANDSHAKE);
-				
 				client->state = HK_STATE_OPEN;
 				client->data_state = HK_DATA_STATE_FRAME;
 				hk_buffer_clear(client->buffer_in);
 				
-				hk_worker_queue_task(task);
+				hk_reader_handle_handshake(client);
 			}
 			break;
 		case HK_DATA_STATE_FRAME:
@@ -320,9 +316,9 @@ hk_reader_on_data(hk_reader_t *reader, hk_client_t *client)
 
 					// take action based on frame type
 					if ( frame->opcode == HK_WS_TEXT_FRAME || frame->opcode == HK_WS_BIN_FRAME ) {
-						hk_reader_handle_data_frame(reader, client, frame);
+						hk_reader_handle_data_frame(client, frame, (void *) reader->clients);
 					} else if ( frame->opcode == HK_WS_PING_FRAME ) {
-						hk_reader_handle_ping_frame(reader, client, frame);
+						hk_reader_handle_ping_frame(client, frame);
 					} else if ( frame->opcode == HK_WS_CLOSE_FRAME ) {
 						// Close frame - end the connection
 						hk_ws_frame_free_with_data(frame);
@@ -658,29 +654,151 @@ hk_reader_validate_handshake_request(hk_http_request_t *request)
 }
 
 static void
-hk_reader_handle_data_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
-{
-	hk_task_t *task;
+hk_reader_handle_data_frame(hk_client_t *client, hk_ws_frame_t *incoming_frame, void *user_data) {
+	hk_hash_cursor_t *cursor;
+	hk_client_t *recipient;
 	
-	task = hk_task_init();
-	hk_task_set_client(task, client);
-	hk_task_set_type(task, HK_TASK_BROADCAST);
-	hk_task_set_data(task, reader->clients);
-	hk_task_set_data2(task, frame);
-
-	hk_worker_queue_task(task);
+	size_t data_offset, data_size;
+	int bytes_written;
+	
+	uint8_t *header;
+	int header_length;
+	
+	data_offset = 0;
+	data_size = incoming_frame->data_length;
+	
+	header = hk_ws_generate_frame_head(data_size, &header_length, 0, incoming_frame->opcode);
+	if ( header == NULL ) {
+		hk_log_error("Cannot create frame head");
+		
+		hk_ws_frame_free_with_data(incoming_frame);
+		return;
+	}
+	
+	cursor = hk_hash_cursor_init((hk_hash_t *) user_data);
+	while ( (recipient = hk_hash_cursor_next(cursor)) != NULL ) {
+		data_offset = 0;
+		data_size = incoming_frame->data_length;
+		
+		if ( recipient->state == HK_STATE_OPEN ) {
+			bytes_written = write(recipient->sock_fd, (char*)header, header_length);
+			
+			bytes_written = write(recipient->sock_fd, incoming_frame->data, data_size);
+			
+			while (bytes_written > 0 && bytes_written < data_size) {
+				data_offset += bytes_written;
+				data_size -= bytes_written;
+				
+				do {
+					errno == 0;
+					bytes_written = write(recipient->sock_fd, incoming_frame->data + data_offset, data_size);
+				} while (bytes_written == -1 && errno == 11);
+			}
+		}
+	}
+	
+	free(header);
+	hk_hash_cursor_free(cursor);
+	hk_ws_frame_free_with_data(incoming_frame);
 }
 
 static void
-hk_reader_handle_ping_frame(hk_reader_t *reader, hk_client_t *client, hk_ws_frame_t *frame)
-{
-	hk_task_t *task;
+hk_reader_handle_ping_frame(hk_client_t *client, hk_ws_frame_t *incoming_frame) {
+	size_t data_offset, data_size;
+	int bytes_written;
 	
-	task = hk_task_init();
-	hk_task_set_client(task, client);
-	hk_task_set_type(task, HK_TASK_PONG);
-	hk_task_set_data(task, NULL);
-	hk_task_set_data2(task, frame);
+	uint8_t *header;
+	int header_length;
+	
+	data_offset = 0;
+	data_size = incoming_frame->data_length;
 
-	hk_worker_queue_task(task);
+	if ( client->state != HK_STATE_OPEN ) {
+		hk_ws_frame_free_with_data(incoming_frame);
+		return;
+	}
+	
+	header = hk_ws_generate_frame_head(data_size, &header_length, 0, HK_WS_PONG_FRAME);
+	if ( header == NULL ) {
+		hk_log_error("Cannot create frame head");
+		
+		hk_ws_frame_free_with_data(incoming_frame);
+		return;
+	}
+	
+	bytes_written = write(client->sock_fd, (char*)header, header_length);
+	bytes_written = write(client->sock_fd, incoming_frame->data, data_size);
+	
+	while (bytes_written > 0 && bytes_written < data_size) {
+		data_offset += bytes_written;
+		data_size -= bytes_written;
+		
+		do {
+			errno == 0;
+			bytes_written = write(client->sock_fd, incoming_frame->data + data_offset, data_size);
+		} while (bytes_written == -1 && errno == 11);
+	}
+	
+	free(header);
+	hk_ws_frame_free_with_data(incoming_frame);
+}
+
+static void 
+hk_reader_handle_handshake(hk_client_t *client)
+{
+	hk_http_request_t *request;
+	int headers_length = 0;
+	char *headers;
+	
+	request = hk_request_init();
+	if ( request == NULL ) {
+		hk_log_error("Cannot create new request");
+		return;
+	}
+	
+	hk_request_ref(request);
+	
+	/* Construct request */
+	hk_request_add_header(request, "Upgrade", -1, "websocket", -1);
+	hk_request_add_header(request, "Connection", -1, "Upgrade", -1);
+	
+	/* Calculate Sec-WebSocket-Accept */
+	{
+		hk_http_header_t *key_header;
+		unsigned char ws_sha1[SHA_DIGEST_LENGTH];
+		char *ws_base64;
+		int ws_base64_length = 0;
+		SHA_CTX sha1;
+		
+		// Compute SHA1
+		key_header = hk_request_get_header(client->request, HK_WS_KEY, -1);
+		
+		SHA1_Init(&sha1);
+		SHA1_Update(&sha1, key_header->value, strlen(key_header->value));
+		SHA1_Update(&sha1, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11", 36);
+		SHA1_Final((unsigned char *) ws_sha1, &sha1);
+		
+		// Compute Base64
+		ws_base64_length = (((SHA_DIGEST_LENGTH + 2) / 3) * 4);
+		ws_base64 = malloc(ws_base64_length+1);
+		if ( ws_base64 == NULL ) {
+			hk_request_unref(request);
+			return;
+		}
+		
+		ws_base64_length = hk_encode_base64((unsigned char *) ws_base64, ws_sha1, SHA_DIGEST_LENGTH);
+		
+		hk_request_add_header(request, "Sec-WebSocket-Accept", -1, ws_base64, ws_base64_length);
+		free(ws_base64);
+	}
+	
+	/* Send request */
+	
+	write(client->sock_fd, "HTTP/1.1 101 Switching Protocols\r\n", 34);
+	
+	headers = hk_request_get_headers_string(request, &headers_length);
+	write(client->sock_fd, headers, headers_length);
+	
+	free(headers);
+	hk_request_unref(request);
 }

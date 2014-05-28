@@ -3,16 +3,12 @@ noinst_LIBRARIES = libhayk.a
 libhayk_a_SOURCES =   \
     hk_buffer.c       \
     hk_buffer.h       \
-    hk_task.c         \
-    hk_task.h         \
     hk_client.c       \
     hk_client.h       \
     hk_reader.c       \
     hk_reader.h       \
     hk_worker.c       \
     hk_worker.h       \
-    hk_sender.c       \
-    hk_sender.h       \
     hk_hash.c         \
     hk_hash.h         \
     hk_list.c         \

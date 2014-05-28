@@ -9,6 +9,4 @@
 #include "hk_worker.h"
 #include "hk_reader.h"
 #include "hk_request.h"
-#include "hk_sender.h"
-#include "hk_task.h"
 #include "hk_ws.h"

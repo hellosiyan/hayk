@@ -19,7 +19,6 @@
 #include "hk_worker.h"
 #include "hk_client.h"
 #include "hk_reader.h"
-#include "hk_sender.h"
 #include "hk_hash.h"
 #include "hk_list.h"
 #include "hk_log.h"
@@ -32,7 +31,6 @@ static hk_worker_t *worker_inst;
 
 static void hk_worker_signals_init();
 static void hk_worker_reader_pool_init();
-static void hk_worker_sender_pool_init();
 static void _hk_worker_stop();
 static void hk_worker_sig(int signo);
 
@@ -58,7 +56,6 @@ hk_worker_create(hk_config_entry_t *config)
 	worker->state = HK_WORKER_STOPPED;
 	
 	worker->readers = hk_list_init();
-	worker->senders = hk_list_init();
 	
 	worker->active_reader = NULL;
 	
@@ -112,7 +109,6 @@ hk_worker_run(hk_worker_t * worker)
 	}
 
 	hk_worker_reader_pool_init();
-	hk_worker_sender_pool_init();
 	
 	int sock_desc, new_desc;
 	int flags;
@@ -247,30 +243,7 @@ _hk_worker_stop()
 		}
 	}
 	
-	{
-		/* Stop and close senders */
-		hk_sender_t *sender;
-		
-		sender = (hk_sender_t *) hk_list_pop(worker->senders);
-		while ( sender != NULL ) {
-			hk_sender_stop(sender);
-			hk_sender_free(sender);
-			sender = (hk_sender_t *) hk_list_pop(worker->senders);
-		}
-	}
-	
 	worker->state = HK_WORKER_STOPPED;
-}
-
-void
-hk_worker_queue_task(hk_task_t *task)
-{
-	hk_sender_t *sender = hk_worker_get()->active_sender;
-	
-	pthread_mutex_lock(sender->mu_tasks);
-	hk_sender_add_task(sender, task);
-	pthread_mutex_unlock(sender->mu_tasks);
-	sem_post(&sender->sem_tasks);
 }
 
 void
@@ -321,22 +294,6 @@ hk_worker_reader_pool_init()
 	}
 	
 	worker->active_reader = (hk_reader_t *)worker->readers->first->data;
-}
-
-static void
-hk_worker_sender_pool_init()
-{
-	hk_worker_t *worker = hk_worker_get();
-	hk_sender_t *new_sender;
-	int i;
-	
-	for (i = 0; i < 3; i += 1) {
-		new_sender = hk_sender_init();
-		hk_sender_run(new_sender);
-		hk_list_push(worker->senders, new_sender);
-	}
-	
-	worker->active_sender = (hk_sender_t *)worker->senders->first->data;
 }
 
 static void
