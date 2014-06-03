@@ -23,24 +23,12 @@ typedef enum {
      HK_SERVER_RESTART
 } hk_server_command_e;
 
-typedef struct hk_server_s hk_server_t;
-struct hk_server_s {
-	hk_list_t *workers;
-	hk_config_t *config;
-	unsigned restart:1;
-};
+int hk_server_init();
 
-hk_server_t *hk_server_init();
-void hk_server_start(hk_server_t *server);
-void hk_server_start_single_proc(hk_server_t *server);
-void hk_server_restart(hk_server_t *server);
-void hk_server_stop(hk_server_t *server);
+void hk_server_start();
+void hk_server_start_single_proc();
+void hk_server_stop();
 
-void hk_server_call_restart(pid_t pid);
-void hk_server_call_stop(pid_t pid);
-
-pid_t hk_read_pid();
-pid_t hk_write_pid();
-void hk_clear_pid();
+int hk_server_is_running();
 
 #endif /* __HK_SERVER_H__ */

@@ -200,7 +200,6 @@ hk_worker_run(hk_worker_t * worker)
 		}
 	}
 
-	printf("exiting .. \n");
  	_hk_worker_stop();
 
  	if ( worker->is_forked ) {

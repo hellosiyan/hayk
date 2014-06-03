@@ -14,68 +14,57 @@ static hk_server_command_e hk_parse_command_arg(char *command);
 int 
 main(int argc, char **argv)
 {
-	hk_server_t *server;
 	hk_server_command_e command;
-	pid_t server_pid;
+	int init_result;
 	
 	if ( argc != 2 ) {
 		/* Wrong number of arguments. */
 		hk_print_help_and_exit();
 	}
-	
-	command = hk_parse_command_arg(argv[1]);
-	server_pid = hk_read_pid();
 
-	if ( hk_log_init(HK_LOG_ALL, HK_LOG_STDERR | HK_LOG_FILE, HK_LOGFILE) == -1 ) {
-		fprintf(stderr, "Cannot open log file "HK_LOGFILE);
+	init_result = hk_server_init();
+	if (init_result != 0 ) {
+		fprintf(stderr, "Error initializing server.\nAborting\n");
 		return EXIT_FAILURE;
 	}
 	
+	command = hk_parse_command_arg(argv[1]);
+	
 	if ( command == HK_SERVER_START || command == HK_SERVER_START_DEBUG ) {
-		if ( server_pid > 0 ) {
-			printf("Server is already running.\n");
+		if ( hk_server_is_running() ) {
+			fprintf(stderr, "Server is already running.\n");
 			return EXIT_FAILURE;
 		}
 		
-		printf("Starting server ...\n");
-		server = hk_server_init();
-		if (server == NULL ) {
-			fprintf(stderr, "Error initializing server.\nAborting\n");
-			return EXIT_FAILURE;
-		}
-		
-		if ( command == HK_SERVER_START ) {
-			hk_server_start(server);
+		if ( command == HK_SERVER_START_DEBUG ) {
+			hk_server_start_single_proc();
 		} else {
-			hk_server_start_single_proc(server);
+			printf("Starting server ...\n");
+			hk_server_start();
+			printf("[OK]\n");
 		}
 	} else if ( command == HK_SERVER_STOP ) {
-		if ( server_pid == 0 ) {
-			printf("Server is not running.\n");
+		if ( ! hk_server_is_running() ) {
+			fprintf(stderr, "Server is not running.\n");
 			return EXIT_FAILURE;
 		}
 		
 		printf("Stopping server ...\n");
-		hk_server_call_stop(server_pid);
+		hk_server_stop();
+
 		printf("[OK]\n");
 	} else if ( command == HK_SERVER_RESTART ) {
-		if ( server_pid == 0 ) {
-			printf("Server is not running.\n");
+		if ( ! hk_server_is_running() ) {
+			fprintf(stderr, "Server is not running.\n");
 			return EXIT_FAILURE;
 		}
 		
 		printf("Stopping server ...\n");
-		hk_server_call_stop(server_pid);
+		hk_server_stop();
+
+		printf("[OK]\nStarting server ...\n");
+		hk_server_start();
 		printf("[OK]\n");
-		
-		printf("Starting server ...\n");
-		server = hk_server_init();
-		if (server == NULL ) {
-			fprintf(stderr, "Error initializing server.\nAborting\n");
-			return EXIT_FAILURE;
-		}
-		
-		hk_server_start(server);
 	}
 	
 	return EXIT_SUCCESS;

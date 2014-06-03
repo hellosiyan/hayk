@@ -13,11 +13,27 @@
 
 #include "hk_server.h"
 
+typedef struct hk_server_s hk_server_t;
+struct hk_server_s {
+	hk_list_t *workers;
+	hk_config_t *config;
+	unsigned restart:1;
+};
+
 static hk_server_t *server_inst;
+
+static hk_server_t *hk_server();
+static pid_t hk_read_pid();
+static pid_t hk_write_pid();
+static void hk_clear_pid();
+
+static void hk_server_stop_real();
+static void hk_server_restart_real();
 
 static void hk_server_signals_init();
 static void hk_server_sig(int signo);
-static void _hk_server_stop(hk_server_t *server, int restart);
+static void hk_server_stop_workers();
+static hk_worker_t *hk_server_create_worker(hk_server_t *server, hk_config_entry_t *config);
 
 typedef struct {
 	int signo;
@@ -33,71 +49,82 @@ static hk_signal_t  signals[] = {
     { 0, NULL }
 };
 
-hk_server_t *
+static hk_server_t *
+hk_server()
+{
+	return server_inst;
+}
+
+int
 hk_server_init()
 {
-	hk_server_t *server;
+	hk_server_t *server = hk_server();
+	
+	if ( server != NULL ) {
+		hk_log_error("Server already initialized");
+		return -1;
+	}
 	
 	server = malloc(sizeof(hk_server_t));
 	if ( server == NULL ) {
-		return NULL;
+		return -1;
 	}
+
 	server->restart = 0;
+
+	if ( hk_log_init(HK_LOG_ALL, HK_LOG_STDERR | HK_LOG_FILE, HK_LOGFILE) == -1 ) {
+		fprintf(stderr, "Cannot open log file "HK_LOGFILE);
+		return EXIT_FAILURE;
+	}
 	
 	server->config = hk_config_init();
 	if ( !hk_config_load(server->config) ) {
 		hk_log_error("Cannot load config file");
-		return NULL;
+		return -1;
 	}
 	
 	server->workers = hk_list_init();
-	
-	hk_log_mark("Hayk "VERSION" - server started");
-	printf("[OK]\n");
-	
-	// create default server
-	{
-		hk_worker_t *worker;
-	
-		worker = hk_worker_create(server->config->defaults);
-		hk_list_push(server->workers, worker);
-	}
-	
-	// create virtuals
-	{
-		hk_config_entry_t *virt_config;
-		hk_list_item_t *item;
-		
-		item = server->config->virtuals->first;
-	
-		while ( item != NULL ) {
-			virt_config = (hk_config_entry_t *) item->data;
-			hk_worker_t *worker;
-	
-			worker = hk_worker_create(virt_config);
-			hk_list_push(server->workers, worker);
-			
-			item = item->next;
-		}
-	}
 	
 	hk_server_signals_init();
 	
 	server_inst = server;
 	
-	return server;
+	return 0;
 }
 
 void
-hk_server_start(hk_server_t *server)
+hk_server_start()
 {
+	pid_t pid;
+	hk_server_t *server = hk_server();
+
 	if ( server == NULL ) {
 		return;
 	}
 	
 	/* Deamonize */
-	daemon(0, 1);
+	pid = fork();
+	if ( pid != 0 ) {
+		return;
+	}
+	daemon(0, 0);
 	hk_write_pid();
+
+	hk_log_mark("Hayk "VERSION" - server started");
+
+	/* Init workers */
+	hk_server_create_worker(server, server->config->defaults);
+
+	{
+		hk_list_item_t *item;
+		
+		item = server->config->virtuals->first;
+	
+		while ( item != NULL ) {
+			hk_server_create_worker(server, (hk_config_entry_t *) item->data);
+			item = item->next;
+		}
+	}
 	
 	/* Loop */
 	do {
@@ -123,38 +150,48 @@ hk_server_start(hk_server_t *server)
 
 
 void
-hk_server_start_single_proc(hk_server_t *server)
+hk_server_start_single_proc()
 {
+	hk_server_t *server = hk_server();
+	hk_worker_t *worker;
+
 	if ( server == NULL ) {
 		return;
 	}
 	
 	hk_write_pid();
-	
-	// start worker
-	{
-		hk_worker_t *worker;
-		hk_list_item_t *item;
 
-		item = server->workers->first;
-
-		worker = (hk_worker_t*) item->data;
-		hk_worker_run(worker);
-	}
+	worker = hk_server_create_worker(server, server->config->defaults);
+	hk_worker_run(worker);
 	
 	hk_clear_pid();
 }
 
-void
-hk_server_stop(hk_server_t *server)
+void 
+hk_server_stop()
 {
-	_hk_server_stop(server, 0);
+	pid_t pid;
+
+	pid = hk_read_pid();
+
+	if ( pid == 0 ) {
+		return;
+	}
+
+	kill(pid, SIGINT);
+	while( hk_read_pid() > 0 ) {
+		sleep(1);
+	}
 }
 
-void
-hk_server_restart(hk_server_t *server)
+int 
+hk_server_is_running()
 {
-	_hk_server_stop(server, 1);
+	pid_t server_pid;
+
+	server_pid = hk_read_pid();
+
+	return server_pid > 0;
 }
 
 static void 
@@ -180,51 +217,47 @@ hk_server_sig(int signo)
 	switch(signo) {
 		case SIGTERM:
 		case SIGINT:
-			hk_server_stop(server_inst);
+			hk_server_stop_real();
 			break;
 		case SIGUSR1:
 		case SIGUSR2:
-			hk_server_restart(server_inst);
+			hk_server_restart_real();
 			break;
 		default:
 			break; 
 	}
 }
 
+static void
+hk_server_stop_real()
+{
+	hk_server_stop_workers();
+
+	server_inst->restart = 0;
+}
 
 static void
-_hk_server_stop(hk_server_t *server, int restart)
+hk_server_restart_real()
+{
+	hk_server_stop_workers();
+
+	server_inst->restart = 1;
+}
+
+static void
+hk_server_stop_workers()
 {
 	hk_worker_t *worker;
 	hk_list_item_t *item;
-	
+	hk_server_t *server;
+
+	server = hk_server();
 	item = server->workers->first;
-	
-	printf("Stopping server %i\n", getpid());
 	
 	while ( item != NULL ) {
 		worker = (hk_worker_t*) item->data;
 		hk_worker_stop(worker);
 		item = item->next;
-	}
-	
-	printf("Stopped server %i\n", getpid());
-	
-	server_inst->restart = restart;
-}
-
-void 
-hk_server_call_restart(pid_t pid)
-{
-	kill(pid, SIGUSR1);
-}
-
-void 
-hk_server_call_stop(pid_t pid)
-{
-	kill(pid, SIGINT);
-	while( hk_read_pid() > 0 ) {
-		sleep(1);
 	}
 }
 
@@ -290,4 +323,15 @@ hk_clear_pid()
 	}
 	
 	close(pid_file);
+}
+
+static hk_worker_t * 
+hk_server_create_worker(hk_server_t *server, hk_config_entry_t *config)
+{
+	hk_worker_t *worker;
+
+	worker = hk_worker_create(config);
+	hk_list_push(server->workers, worker);
+
+	return worker;
 }
