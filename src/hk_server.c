@@ -261,7 +261,7 @@ hk_server_stop_workers()
 	}
 }
 
-pid_t
+static pid_t
 hk_read_pid()
 {
 	int pid_file;
@@ -289,7 +289,7 @@ hk_read_pid()
 	return pid;
 }
 
-pid_t
+static pid_t
 hk_write_pid()
 {
 	int pid_file;
@@ -313,7 +313,7 @@ hk_write_pid()
 	return pid;
 }
 
-void
+static void
 hk_clear_pid()
 {
 	int pid_file;
