@@ -13,7 +13,7 @@ hayk_CFLAGS =       \
     -DPACKAGE_CONF_FILE=\""$(sysconfdir)/hayk.cfg"\"
 
 hayk_LDADD = \
+    lib/libhayk.a \
 	-lssl    \
 	-lcrypto \
-	-lconfig \
-    lib/libhayk.a
+	-lconfig 
